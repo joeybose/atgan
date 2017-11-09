@@ -1,0 +1,3 @@
+export HOME=/ais/clspace5/u/kawin
+export PYTHONPATH=/ais/clspace5/u/kawin/local/lib/python2.7/site-packages:/pkgs/pythorch-0.2.0:$PYTHONPATH
+easy_install --prefix=$HOME/local torchvision
