@@ -62,7 +62,7 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25):
 			correct += predicted.eq(labels.data).sum()
 
 			# perturb
-			_, predicted = torch.max(model(attacker.attack(inputs)).data, 1)
+			_, predicted = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
 			correct_adv = predicted.eq(labels.data).sum() 
 
 			# print statistics
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
 		cudnn.benchmark = True
 
-	attacker = attacks.FGSM(0.25)
+	attacker = attacks.FGSM(epsilon=0.25)
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=25)
