@@ -15,6 +15,11 @@ def L2_dist(x, y):
 	return reduce_sum((x - y)**2)
 
 
+def torch_arctanh(x, eps=1e-6):
+	x = x * (1. - eps)
+	return (torch.log((1 + x) / (1 - x))) * 0.5
+
+
 class FGSM(object):
 	def __init__(self, epsilon=0.25):
 		self.epsilon = epsilon
@@ -59,7 +64,6 @@ class CarliniWagner(object):
 		self.learning_rate = learning_rate
 		self.initial_const = initial_const
 		self.num_labels = num_labels
-		self.shape = shape
 
 		self.binary_search_steps = binary_search_steps
 		self.repeat = binary_search_steps >= 10
@@ -103,12 +107,12 @@ class CarliniWagner(object):
 		# transform the original inputs in the same way (arctan, then clip)
 		unmodified = (torch.tanh(inputs) + 1) * 0.5
 		unmodified = unmodified * (self.clip_max - self.clip_min) + self.clip_min
-		dist = L2_dist(input_adv, unmodified).sum()
-		loss2 = dist		
+		dist = L2_dist(inputs_adv, unmodified)
+		loss2 = dist.sum()
 
 		# compute probability of label class and maximum other
 		real = (labels * predicted).sum(1)
-		other = ((1. - label) * predicted - label * 10000.).max(1)[0]
+		other = ((1. - labels) * predicted - labels * 10000.).max(1)[0]
 
 		# the greater the likelihood of label, the greater the loss
 		loss1 = torch.clamp(real - other + self.confidence, min=0.)  # equiv to max(..., 0.)
@@ -116,28 +120,32 @@ class CarliniWagner(object):
 		loss = loss1 + loss2 		
 
 		optimizer.zero_grad()
-		loss.backward()
+		loss.backward(retain_graph=True)
 		optimizer.step()
 
 		# convert to numpy form before returning it 
 		loss = loss.data.cpu().numpy()[0]
 		dist = dist.data.cpu().numpy()
 		predicted = predicted.data.cpu().numpy()
-		# input_adv = input_adv.data.permute(0, 2, 3, 1).cpu().numpy()
+		# inputs_adv = inputs_adv.data.permute(0, 2, 3, 1).cpu().numpy()
 
-		return loss, dist, predicted, input_adv
+		return loss, dist, predicted, inputs_adv
 
 	def attack(self, inputs, labels, model):
 		"""
-                Given a set of inputs, labels, and the model, return the perturbed inputs (as Variable objects).
+		Given a set of inputs, labels, and the model, return the perturbed inputs (as Variable objects).
 		inputs and labels should be Variable objects themselves.
-                """
+		"""
 		batch_size = inputs.size(0)
+		labels = labels.data
 
-		# reverse the transformation that will happen in _optimize for the inputs
+		# re-scale instances to be within range [0, 1]
 		input_vars = (inputs - self.clip_min) / (self.clip_max - self.clip_min)
-		input_vars = input_vars * 2 - 1
-		input_vars = input_vars * (1 - 1e-6)
+		input_vars = torch.clamp(input_vars, 0., 1.)
+		# now convert to [-1, 1]
+		input_vars = (input_vars * 2) - 1
+		# convert to tanh-space
+		input_vars = input_vars * .999999
 		input_vars = (torch.log((1 + input_vars) / (1 - input_vars))) * 0.5 # arctanh
 
 		# set the lower and upper bounds accordingly
@@ -148,19 +156,17 @@ class CarliniWagner(object):
 		# numpy placeholders for the overall best l2, most likely label, and adversarial image
 		o_best_l2 = [1e10] * batch_size
 		o_best_score = [-1] * batch_size
-		o_best_attack = inputs
+		o_best_attack = inputs.clone()
 			
 		# one-hot encoding of labels
-		one_hot_labels = torch.zeros(labels.size() + (self.num_classes,))
+		one_hot_labels = torch.zeros(labels.size() + (self.num_labels,))
 		if self.cuda: one_hot_labels = one_hot_labels.cuda()
-		one_hot_labels.scatter_(1, labels.unsqueeze(1), 1)
+		one_hot_labels.scatter_(1, labels.unsqueeze(1), 1.)
 		label_vars = Variable(one_hot_labels, requires_grad=False)
 
 		# setup the modifier variable; this is the variable we are optimizing over
-		modifier_var = Variable(
-			torch.zeros(input_vars.size()).cuda() if self.cuda else torch.zeros(input_vars.size()),
-			requires_grad=False
-		)
+		modifier = torch.zeros(inputs.size()).float()
+		modifier_var = Variable(modifier.cuda() if self.cuda else modifier, requires_grad=True)
 
 		optimizer = optim.Adam([modifier_var], lr=self.learning_rate)
 		
@@ -173,23 +179,21 @@ class CarliniWagner(object):
 			if self.repeat and search_step == self.binary_search_steps - 1:
 				scale_const = upper_bound
 
-			scale_const_var = Variable(
-				torch.from_numpy(scale_const).cuda() if self.cuda else torch.from_numpy(scale_const),
-				requires_grad=False
-			)
+			scale_const_tensor = torch.from_numpy(scale_const).float()	# .float() needed to conver to FloatTensor
+			scale_const_var = Variable(scale_const_tensor.cuda() if self.cuda else scale_const_tensor, requires_grad=False)
 
-			prev_loss = 1e-6	# for early abort
+			prev_loss = 1e-1	# for early abort
 
-			for step in range(self.max_steps): 
+			for step in range(self.max_iterations): 
 				loss, dist, predicted, input_adv = self._optimize(model, optimizer, modifier_var, 
 					input_vars, label_vars, scale_const_var)	
 
-				if step % 100 == 0 or step == self.max_steps - 1:
+				if step % 10 == 0 or step == self.max_iterations - 1:
 					print "Step: {0:>4}, loss: {1:6.4f}, dist: {2:8.5f}, modifier mean: {3:.5e}".format(
 						step, loss, dist.mean(), modifier_var.data.mean())
 
 				# abort early if loss is too small
-				if self.abort_early and step % (self.max_steps // 10) == 0:
+				if self.abort_early and step % (self.max_iterations // 20) == 0:
 					if loss > prev_loss * 0.9999:
 						print 'Aborting early...'
 						break
@@ -199,14 +203,15 @@ class CarliniWagner(object):
 				# update best result for each image
 				for i in range(batch_size):
 					y_hat = np.argmax(predicted[i])
+					y = labels[i]
 
 					# if smaller perturbation and still different predicted class ... 
-					if dist[i] < best_l2[i] and self._compare(prediction[i], labels[i]):
+					if dist[i] < best_l2[i] and self._compare(y_hat, y):
 						best_l2[i] = dist[i]
 						best_score[i] = y_hat
 
 					# update overall best results
-					if dist[i] < o_best_l2[i] and self._compare(prediction[i], labels[i]):
+					if dist[i] < o_best_l2[i] and self._compare(y_hat, y):
 						o_best_l2[i] = dist[i]
 						o_best_score[i] = y_hat
 						o_best_attack[i] = input_adv[i]					
@@ -229,7 +234,7 @@ class CarliniWagner(object):
 					lower_bound[i] = max(lower_bound[i], scale_const[i])
 					upper_bound[i] = (lower_bound[i] + upper_bound[i]) / 2 if (upper_bound[i] < 1e9) else (scale_const[i] * 10)
 				
-				if self._compare(o_best_score[i], label[i]) and o_best_score[i] != -1:
+				if self._compare(o_best_score[i], labels[i]) and o_best_score[i] != -1:
 					batch_success += 1
 				else:
 					batch_failure += 1
