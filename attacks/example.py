@@ -111,12 +111,12 @@ if __name__ == "__main__":
 	if use_cuda:
 		model.cuda()
 		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
-		cudnn.benchmark = True
+		cudnn.benchmark = True 
 
 	attacker = attacks.FGSM(epsilon=0.25)
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=25)
+	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=5)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
