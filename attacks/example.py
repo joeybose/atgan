@@ -68,8 +68,8 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25):
 			# print statistics
 			running_loss = loss.data[0]
 
-			if (i+1) % 100 == 0:
-				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 100), correct/total, correct_adv/total
+			if (i+1) % 2 == 0:
+				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total
 				running_loss = 0.0
 
 			optimizer.step()
@@ -114,6 +114,8 @@ if __name__ == "__main__":
 		cudnn.benchmark = True 
 
 	attacker = attacks.FGSM(epsilon=0.25)
+	attacker = attacks.CarliniWagner()
+
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
