@@ -76,10 +76,6 @@ class CarliniWagner(object):
 		self.clip_max = clip_max
 		self.cuda = torch.cuda.is_available()
 
-		# setup the modifier variable; this is the variable we are optimizing over
-		modifier = torch.zeros(shape).float()
-		self.modifier_var = Variable(modifier.cuda() if self.cuda else modifier, requires_grad=True)
-
 	def _compare(self, prediction, label):
 		"""
 		Return True if label is not the most likely class.
@@ -172,13 +168,11 @@ class CarliniWagner(object):
 		one_hot_labels.scatter_(1, labels.unsqueeze(1), 1.)
 		label_vars = Variable(one_hot_labels, requires_grad=False)
 
-		"""
 		# setup the modifier variable; this is the variable we are optimizing over
 		modifier = torch.zeros(inputs.size()).float()
 		modifier_var = Variable(modifier.cuda() if self.cuda else modifier, requires_grad=True)
-		"""
 
-		optimizer = optim.Adam([self.modifier_var], lr=self.learning_rate)
+		optimizer = optim.Adam([modifier_var], lr=self.learning_rate)
 		
 		for outer_step in range(self.binary_search_steps):
 			print '\nsearch step: {0}'.format(outer_step)
@@ -195,12 +189,12 @@ class CarliniWagner(object):
 			prev_loss = 1e3 	# for early abort
 
 			for step in range(self.max_iterations): 
-				loss, dist, predicted, input_adv = self._optimize(model, optimizer, self.modifier_var, 
+				loss, dist, predicted, input_adv = self._optimize(model, optimizer, modifier_var, 
 					input_vars, label_vars, scale_const_var)	
 
 				if step % 10 == 0 or step == self.max_iterations - 1:
 					print "Step: {0:>4}, loss: {1:6.6f}, dist: {2:8.6f}, modifier mean: {3:.6e}".format(
-						step, loss, dist.mean(), self.modifier_var.data.mean())
+						step, loss, dist.mean(), modifier_var.data.mean())
 			
 
 				# abort early if loss is too small

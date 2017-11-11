@@ -66,10 +66,10 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25):
 			# print statistics
 			running_loss = loss.data[0]
 
-			if (i+1) % 100 == 0:
+			if (i+1) % 1 == 0:
 				# perturb
-				# _, predicted_adv = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
-				# correct_adv += predicted_adv.eq(labels.data).sum()
+				_, predicted_adv = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
+				correct_adv += predicted_adv.eq(labels.data).sum()
 				total_adv += float(labels.size(0))
 
 				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
