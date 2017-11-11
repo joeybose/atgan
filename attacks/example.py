@@ -10,6 +10,7 @@ from models.vgg import VGG
 import attacks
 
 use_cuda = torch.cuda.is_available()
+use_cuda = False
 
 
 def load_cifar():
@@ -44,37 +45,37 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25):
 	""" 
 	for epoch in range(num_epochs):
 		running_loss = 0.0
-		total, correct, correct_adv = 0.0, 0.0, 0.0
+		total, correct, total_adv, correct_adv = 0.0, 0.0, 0.0, 0.0
 		
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
 			inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
 			labels = Variable((labels.cuda() if use_cuda else labels), requires_grad=False)
 
-			optimizer.zero_grad()
-
 			y_hat = model(inputs)
-			loss = criterion(y_hat, labels)
+			loss = criterion(y_hat, labels)			
+
+			optimizer.zero_grad()
 			loss.backward()
+			optimizer.step()
 
 			_, predicted = torch.max(y_hat.data, 1)
 			total += labels.size(0)
 			correct += predicted.eq(labels.data).sum()
 
-			# perturb
-			_, predicted = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
-			correct_adv = predicted.eq(labels.data).sum() 
-
 			# print statistics
 			running_loss = loss.data[0]
 
-			if (i+1) % 2 == 0:
-				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total
+			if (i+1) % 100 == 0:
+				# perturb
+				# _, predicted_adv = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
+				# correct_adv += predicted_adv.eq(labels.data).sum()
+				total_adv += float(labels.size(0))
+
+				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
 				running_loss = 0.0
 
-			optimizer.step()
-
-	return correct/total, correct_adv/total
+	return correct/total, correct_adv/total_adv
 
 
 def test(model, criterion, testloader, attacker):
@@ -99,7 +100,7 @@ def test(model, criterion, testloader, attacker):
 
 		# perturb
 		_, predicted = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
-		correct_adv = predicted.eq(labels.data).sum()
+		correct_adv += predicted.eq(labels.data).sum()
 
 	return correct/total, correct_adv/total
 
@@ -118,7 +119,7 @@ if __name__ == "__main__":
 
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
+	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=25)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
