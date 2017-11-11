@@ -34,8 +34,8 @@ class FGSM(object):
 
 
 class CarliniWagner(object):
-	def __init__(self, confidence=0, learning_rate=1e-4, binary_search_steps=5, max_iterations=1000, 
-		initial_const=1e-4, num_labels=10, clip_min=-1, clip_max=1):
+	def __init__(self, confidence=0, learning_rate=1e-3, binary_search_steps=5, max_iterations=1000, 
+		initial_const=0.01, num_labels=10, clip_min=-1, clip_max=1, shape=(3L, 32L, 32L)):
 		"""
 		Return a tensor that constructs adversarial examples for the given input.
 		Only supports untargeted attacks.
@@ -75,6 +75,10 @@ class CarliniWagner(object):
 		self.clip_min = clip_min
 		self.clip_max = clip_max
 		self.cuda = torch.cuda.is_available()
+
+		# setup the modifier variable; this is the variable we are optimizing over
+		modifier = torch.zeros(shape).float()
+		self.modifier_var = Variable(modifier.cuda() if self.cuda else modifier, requires_grad=True)
 
 	def _compare(self, prediction, label):
 		"""
@@ -120,7 +124,7 @@ class CarliniWagner(object):
 		loss = loss1 + loss2 		
 
 		optimizer.zero_grad()
-		loss.backward(retain_graph=True)
+		loss.backward()
 		optimizer.step()
 
 		# convert to numpy form before returning it 
@@ -136,17 +140,21 @@ class CarliniWagner(object):
 		Given a set of inputs, labels, and the model, return the perturbed inputs (as Variable objects).
 		inputs and labels should be Variable objects themselves.
 		"""
+		inputs = inputs.clone()
+		labels = labels.clone()
+
 		batch_size = inputs.size(0)
 		labels = labels.data
 
 		# re-scale instances to be within range [0, 1]
-		input_vars = (inputs - self.clip_min) / (self.clip_max - self.clip_min)
+		input_vars = (inputs.data - self.clip_min) / (self.clip_max - self.clip_min)
 		input_vars = torch.clamp(input_vars, 0., 1.)
 		# now convert to [-1, 1]
 		input_vars = (input_vars * 2) - 1
 		# convert to tanh-space
 		input_vars = input_vars * .999999
 		input_vars = (torch.log((1 + input_vars) / (1 - input_vars))) * 0.5 # arctanh
+		input_vars = Variable(input_vars, requires_grad=False)
 
 		# set the lower and upper bounds accordingly
 		lower_bound = np.zeros(batch_size)
@@ -164,14 +172,16 @@ class CarliniWagner(object):
 		one_hot_labels.scatter_(1, labels.unsqueeze(1), 1.)
 		label_vars = Variable(one_hot_labels, requires_grad=False)
 
+		"""
 		# setup the modifier variable; this is the variable we are optimizing over
 		modifier = torch.zeros(inputs.size()).float()
 		modifier_var = Variable(modifier.cuda() if self.cuda else modifier, requires_grad=True)
+		"""
 
-		optimizer = optim.Adam([modifier_var], lr=self.learning_rate)
+		optimizer = optim.Adam([self.modifier_var], lr=self.learning_rate)
 		
 		for outer_step in range(self.binary_search_steps):
-			print 'search step: {0}'.format(outer_step)
+			print '\nsearch step: {0}'.format(outer_step)
 			best_l2 = [1e10] * batch_size
 			best_score = [-1] * batch_size
 
@@ -182,18 +192,19 @@ class CarliniWagner(object):
 			scale_const_tensor = torch.from_numpy(scale_const).float()	# .float() needed to conver to FloatTensor
 			scale_const_var = Variable(scale_const_tensor.cuda() if self.cuda else scale_const_tensor, requires_grad=False)
 
-			prev_loss = 1e-1	# for early abort
+			prev_loss = 1e3 	# for early abort
 
 			for step in range(self.max_iterations): 
-				loss, dist, predicted, input_adv = self._optimize(model, optimizer, modifier_var, 
+				loss, dist, predicted, input_adv = self._optimize(model, optimizer, self.modifier_var, 
 					input_vars, label_vars, scale_const_var)	
 
 				if step % 10 == 0 or step == self.max_iterations - 1:
 					print "Step: {0:>4}, loss: {1:6.6f}, dist: {2:8.6f}, modifier mean: {3:.6e}".format(
-						step, loss, dist.mean(), modifier_var.data.mean())
+						step, loss, dist.mean(), self.modifier_var.data.mean())
+			
 
 				# abort early if loss is too small
-				if self.abort_early and step % (self.max_iterations // 20) == 0:
+				if self.abort_early and step % (self.max_iterations // 10) == 0: 
 					if loss > prev_loss * 0.9999:
 						print 'Aborting early...'
 						break
@@ -215,7 +226,7 @@ class CarliniWagner(object):
 						o_best_l2[i] = dist[i]
 						o_best_score[i] = y_hat
 						o_best_attack[i] = input_adv[i]					
-		
+	
 				sys.stdout.flush()	
 
 			# adjust constants
