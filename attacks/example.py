@@ -98,7 +98,7 @@ def test(model, criterion, testloader, attacker):
 		correct += predicted.eq(labels.data).sum() 
 
 		# perturb
-		_, predicted = torch.max(model(attacker.attack(inputs)).data, 1)
+		_, predicted = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
 		correct_adv = predicted.eq(labels.data).sum()
 
 	return correct/total, correct_adv/total
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 	attacker = attacks.FGSM(epsilon=0.25)
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=5)
+	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
