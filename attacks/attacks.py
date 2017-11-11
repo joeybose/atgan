@@ -34,8 +34,8 @@ class FGSM(object):
 
 
 class CarliniWagner(object):
-	def __init__(self, confidence=0, learning_rate=1e-3, binary_search_steps=5, max_iterations=1000, 
-		initial_const=0.01, num_labels=10, clip_min=-1, clip_max=1):
+	def __init__(self, confidence=0, learning_rate=1e-4, binary_search_steps=5, max_iterations=1000, 
+		initial_const=1e-4, num_labels=10, clip_min=-1, clip_max=1):
 		"""
 		Return a tensor that constructs adversarial examples for the given input.
 		Only supports untargeted attacks.
@@ -189,7 +189,7 @@ class CarliniWagner(object):
 					input_vars, label_vars, scale_const_var)	
 
 				if step % 10 == 0 or step == self.max_iterations - 1:
-					print "Step: {0:>4}, loss: {1:6.4f}, dist: {2:8.5f}, modifier mean: {3:.5e}".format(
+					print "Step: {0:>4}, loss: {1:6.6f}, dist: {2:8.6f}, modifier mean: {3:.6e}".format(
 						step, loss, dist.mean(), modifier_var.data.mean())
 
 				# abort early if loss is too small
