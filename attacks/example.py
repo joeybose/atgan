@@ -8,9 +8,9 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 from models.vgg import VGG
 import attacks
+import numpy as np
 
 use_cuda = torch.cuda.is_available()
-use_cuda = False
 
 
 def load_cifar():
@@ -38,14 +38,17 @@ def load_cifar():
 	return trainloader, testloader
 
 
-def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25):
+def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25, freq=100):
 	"""
 	Train the model with the optimizer and criterion for num_epochs epochs on data trainloader.
 	attacker is an object that produces adversial inputs given regular inputs.
+	Return the accuracy on the normal inputs and on the perturbed inputs.
+
+	To save time, only perturb inputs on the last epoch, at the frequency freq.
 	""" 
 	for epoch in range(num_epochs):
 		running_loss = 0.0
-		total, correct, total_adv, correct_adv = 0.0, 0.0, 0.0, 0.0
+		total, correct, correct_adv, total_adv  = 0.0, 0.0, 0.0, 1.0
 		
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
@@ -66,22 +69,24 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25):
 			# print statistics
 			running_loss = loss.data[0]
 
-			if (i+1) % 1 == 0:
-				# perturb
-				_, predicted_adv = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
-				correct_adv += predicted_adv.eq(labels.data).sum()
-				total_adv += float(labels.size(0))
+			# only perturb inputs on the last epoch, to save time
+			if (i+1) % freq == 0 and (epoch == num_epochs - 1):
+				adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
+				correct_adv += num_unperturbed
+				total_adv += labels.size(0)
 
+			if (i+1) % 100 == 0:
 				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
 				running_loss = 0.0
 
-	return correct/total, correct_adv/total_adv
+	return correct/total, correct_adv/total_adv 
 
 
 def test(model, criterion, testloader, attacker):
 	"""
 	Test the model with the data from testloader.
 	attacker is an object that produces adversial inputs given regular inputs.
+	Return the accuracy on the normal inputs and the unperturbed inputs.
 	"""
 	correct, correct_adv, total = 0.0, 0.0, 0.0
 
@@ -94,13 +99,16 @@ def test(model, criterion, testloader, attacker):
 		loss = criterion(y_hat, labels)
 		loss.backward()
 
-		_, predicted = torch.max(y_hat.data, 1)
-		total += labels.size(0)
+		predicted = torch.max(y_hat.data, 1)[1]
 		correct += predicted.eq(labels.data).sum() 
 
-		# perturb
-		_, predicted = torch.max(model(attacker.attack(inputs, labels, model)).data, 1)
-		correct_adv += predicted.eq(labels.data).sum()
+		adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
+		correct_adv += num_unperturbed
+
+		total += labels.size(0)
+
+		if total >= 1000:
+			break
 
 	return correct/total, correct_adv/total
 
@@ -119,7 +127,7 @@ if __name__ == "__main__":
 
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=25)
+	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=10)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
