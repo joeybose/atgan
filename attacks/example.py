@@ -119,7 +119,8 @@ if __name__ == "__main__":
 		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
 		cudnn.benchmark = True 
 
-	attacker = attacks.FGSM(epsilon=0.25)
+	# use default hyperparams for best results!
+	attacker = attacks.FGSM()
 	attacker = attacks.CarliniWagner()
 
 	criterion = nn.CrossEntropyLoss()
