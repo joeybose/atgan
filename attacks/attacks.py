@@ -26,16 +26,27 @@ class FGSM(object):
 
 	def attack(self, inputs, labels, model):
 		"""
-		Given a set of inputs and epsilon, return the perturbed inputs (as Variable objects).
+		Given a set of inputs and epsilon, return the perturbed inputs (as Variable objects),
+		the predictions for the inputs from the model, and the percentage of inputs 
+		unsucessfully perturbed (i.e., model accuracy).
+
+		The adversarial inputs is a python list of Variables.
+		The predictions is a numpy array of classes, with length equal to the number of inputs.
 		"""
 		adv_inputs = inputs.data + self.epsilon * torch.sign(inputs.grad.data)
 		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
-		return Variable(adv_inputs, requires_grad=False)
+		adv_inputs = Variable(adv_inputs, requires_grad=False)
+		
+		predictions = torch.max(model(adv_inputs).data, 1)[1].cpu().numpy()
+		num_unperturbed = (predictions == labels.data.cpu().numpy()).sum()
+		adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0)) ]	
+	
+		return adv_inputs, predictions, num_unperturbed
 
 
 class CarliniWagner(object):
 	def __init__(self, confidence=0, learning_rate=1e-3, binary_search_steps=5, max_iterations=1000, 
-		initial_const=0.01, num_labels=10, clip_min=-1, clip_max=1, shape=(3L, 32L, 32L)):
+		initial_const=1, num_labels=10, clip_min=-1, clip_max=1, verbose=False):
 		"""
 		Return a tensor that constructs adversarial examples for the given input.
 		Only supports untargeted attacks.
@@ -59,6 +70,7 @@ class CarliniWagner(object):
 		- clip_min : Minimum input component value.
 		- clip_max : Maximum input component value.
 		- num_labels : Number of classes in the model's output.
+		- verbose : Print output in detail.
 		"""
 		self.confidence = confidence
 		self.learning_rate = learning_rate
@@ -70,7 +82,8 @@ class CarliniWagner(object):
 		self.max_iterations = max_iterations
 		
 		# allows early aborts if gradient descent is unable to make progress 
-		self.abort_early = True
+		self.abort_early = True 
+		self.verbose = verbose
 
 		self.clip_min = clip_min
 		self.clip_max = clip_max
@@ -175,12 +188,12 @@ class CarliniWagner(object):
 		optimizer = optim.Adam([modifier_var], lr=self.learning_rate)
 		
 		for outer_step in range(self.binary_search_steps):
-			print '\nsearch step: {0}'.format(outer_step)
+			if self.verbose: print '\nsearch step: {0}'.format(outer_step)
 			best_l2 = [1e10] * batch_size
 			best_score = [-1] * batch_size
 
 			# last iteration (if we run many steps) repeat the search once
-			if self.repeat and search_step == self.binary_search_steps - 1:
+			if self.repeat and outer_step == self.binary_search_steps - 1:
 				scale_const = upper_bound
 
 			scale_const_tensor = torch.from_numpy(scale_const).float()	# .float() needed to conver to FloatTensor
@@ -193,14 +206,14 @@ class CarliniWagner(object):
 					input_vars, label_vars, scale_const_var)	
 
 				if step % 10 == 0 or step == self.max_iterations - 1:
-					print "Step: {0:>4}, loss: {1:6.6f}, dist: {2:8.6f}, modifier mean: {3:.6e}".format(
+					if self.verbose: print "Step: {0:>4}, loss: {1:6.6f}, dist: {2:8.6f}, modifier mean: {3:.6e}".format(
 						step, loss, dist.mean(), modifier_var.data.mean())
 			
 
 				# abort early if loss is too small
 				if self.abort_early and step % (self.max_iterations // 10) == 0: 
 					if loss > prev_loss * 0.9999:
-						print 'Aborting early...'
+						if self.verbose: print 'Aborting early...'
 						break
 
 					prev_loss = loss
@@ -244,8 +257,16 @@ class CarliniWagner(object):
 				else:
 					batch_failure += 1
 
-			print 'failures: {0} successes: {1}'.format(batch_failure, batch_success)
+			if self.verbose: print 'failures: {0} successes: {1}'.format(batch_failure, batch_success)
 			sys.stdout.flush()
 
-		return o_best_attack
+		# if no good adv attack, then equivalent to using base image
+		for i in range(len(o_best_score)):
+			if o_best_score[i] == -1:
+				o_best_score[i] = labels[i]
+
+		o_best_score = np.array(o_best_score)
+		num_unperturbed = (o_best_score == labels.cpu().numpy()).sum()
+	
+		return o_best_attack, o_best_score, num_unperturbed
 	
