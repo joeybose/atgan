@@ -30,7 +30,7 @@ class FGSM(object):
 		the predictions for the inputs from the model, and the percentage of inputs 
 		unsucessfully perturbed (i.e., model accuracy).
 
-		The adversarial inputs is a python list of Variables.
+		The adversarial inputs is a python list of tensors.
 		The predictions is a numpy array of classes, with length equal to the number of inputs.
 		"""
 		adv_inputs = inputs.data + self.epsilon * torch.sign(inputs.grad.data)
