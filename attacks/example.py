@@ -107,9 +107,6 @@ def test(model, criterion, testloader, attacker):
 
 		total += labels.size(0)
 
-		if total >= 1000:
-			break
-
 	return correct/total, correct_adv/total
 
 
