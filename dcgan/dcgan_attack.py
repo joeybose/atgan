@@ -14,7 +14,8 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from torch.autograd import Variable
-
+import numpy as np
+import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw | fake')
@@ -32,7 +33,7 @@ parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
-parser.add_argument('--outf', default='./results/', help='folder to output images and model checkpoints')
+parser.add_argument('--outf', default='./results', help='folder to output images and model checkpoints')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
 opt = parser.parse_args()
@@ -215,6 +216,14 @@ fixed_noise = Variable(fixed_noise)
 optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
+log_data = pd.DataFrame(np.nan, index=[], 
+                        columns=['epoch', 'niter', 'D_loss','D_x','perturbation_norm'])
+
+### SET NAME OF LOG FILE HERE #####
+name_to_save_file = 'training_log.csv'
+f = open('%s/%s'%(opt.outf,name_to_save_file), 'w')
+f.close()
+
 for epoch in range(opt.niter):
     for i, batch in enumerate(dataloader):
         data, classes = batch[0], batch[1]
@@ -268,6 +277,11 @@ for epoch in range(opt.niter):
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
+        
+        df2 = pd.DataFrame([[epoch,i,errD_real.data[0],D_x,torch.norm(fake,2).data[0]]], 
+                           columns=['epoch', 'iter', 'D_loss','D_x','perturbation_norm'])
+        log_data = log_data.append(df2)
+        
         if i % 100 == 0:
             vutils.save_image(real_cpu,
                     '%s/real_samples.png' % opt.outf,
@@ -280,3 +294,4 @@ for epoch in range(opt.niter):
     # do checkpointing
     torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (opt.outf, epoch))
     torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (opt.outf, epoch))
+    log_data.to_csv('%s/%s'%(opt.outf,name_to_save_file),encoding='utf-8')
