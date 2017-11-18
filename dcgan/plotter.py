@@ -15,7 +15,7 @@ plt.setp(ax1.get_xticklabels(), fontsize=6)
 plt.legend()
 
 ax2 = plt.subplot(312, sharex=ax1)
-plt.plot(load_log.iter,load_log.D_x, 'b*',label='D(x)')
+plt.plot(load_log.iter,load_log.G_loss, 'b*',label='G_loss')
 plt.legend()
 # # make these tick labels invisible
 # plt.setp(ax2.get_xticklabels(), visible=False)

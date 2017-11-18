@@ -217,7 +217,7 @@ optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
 log_data = pd.DataFrame(np.nan, index=[], 
-                        columns=['epoch', 'niter', 'D_loss','D_x','perturbation_norm'])
+                        columns=['epoch', 'iter', 'D_loss', 'G_loss','D_x','D_G_z1','D_G_z2','perturbation_norm'])
 
 ### SET NAME OF LOG FILE HERE #####
 name_to_save_file = 'training_log.csv'
@@ -278,8 +278,9 @@ for epoch in range(opt.niter):
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
         
-        df2 = pd.DataFrame([[epoch,i,errD_real.data[0],D_x,torch.norm(fake,2).data[0]]], 
-                           columns=['epoch', 'iter', 'D_loss','D_x','perturbation_norm'])
+        df2 = pd.DataFrame([[epoch,i,errD.data[0],errG.data[0],D_x,D_G_z1, 
+                             D_G_z2,torch.norm(fake,2).data[0]]], 
+                               columns=['epoch', 'iter', 'D_loss', 'G_loss','D_x','D_G_z1','D_G_z2','perturbation_norm'])
         log_data = log_data.append(df2)
         
         if i % 100 == 0:
