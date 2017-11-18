@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
 from models.vgg import VGG
+from models.lenet import LeNet
 import attacks
 import numpy as np
 
@@ -125,7 +126,7 @@ if __name__ == "__main__":
 
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=10)
+	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=100)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
