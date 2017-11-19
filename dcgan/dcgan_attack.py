@@ -268,8 +268,9 @@ for epoch in range(opt.niter):
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
         netG.zero_grad()
-        output = output_fake + c_g * torch.norm(fake,2).pow(2)
-        errG = torch.mean(torch.sum(output,0))
+        G_loss_term_1 = criterion(-1*torch.exp(output_fake),labelv)
+        output = G_loss_term_1 + c_g * torch.norm(fake,2).pow(2)
+        errG = output
         errG.backward()
         D_G_z2 = output.data.mean()
         optimizerG.step()
@@ -288,7 +289,7 @@ for epoch in range(opt.niter):
             #        '%s/real_samples.png' % opt.outf,
             #        normalize=True)
             fake = netG(Variable(inputv.grad.data)) + inputv
-            vutils.save_image(fake.data,
+            vutils.save_image(fake.data[0:32],
                     '%s/images/l2_fake_samples_epoch_%03d.png' % (opt.outf, epoch),
                     normalize=True)
 
