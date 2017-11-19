@@ -27,7 +27,7 @@ parser.add_argument('--nz', type=int, default=100, help='size of the latent z ve
 parser.add_argument('--ngf', type=int, default=48)
 parser.add_argument('--ndf', type=int, default=48)
 parser.add_argument('--niter', type=int, default=1000, help='number of epochs to train for')
-parser.add_argument('--lr', type=float, default=0.0001, help='learning rate, default=0.0002')
+parser.add_argument('--lr', type=float, default=0.001, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
@@ -220,7 +220,7 @@ log_data = pd.DataFrame(np.nan, index=[],
                         columns=['epoch', 'iter', 'D_loss', 'G_loss','D_x','D_G_z1','D_G_z2','perturbation_norm'])
 
 ### SET NAME OF LOG FILE HERE #####
-name_to_save_file = 'training_log.csv'
+name_to_save_file = 'training_log2.csv'
 f = open('%s/%s'%(opt.outf,name_to_save_file), 'w')
 f.close()
 
@@ -275,9 +275,11 @@ for epoch in range(opt.niter):
         D_G_z2 = output.data.mean()
         optimizerG.step()
 
-        print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+        print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)):\
+                %.4f / %.4f, perturbation norm :%.4f'\
               % (epoch, opt.niter, i, len(dataloader),
-                 errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
+                 errD.data[0], errG.data[0], D_x, D_G_z1,
+                 D_G_z2,torch.norm(fake,2).data[0]))
 
         df2 = pd.DataFrame([[epoch,i,errD.data[0],errG.data[0],D_x,D_G_z1,
                              D_G_z2,torch.norm(fake,2).data[0]]],
