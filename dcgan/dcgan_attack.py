@@ -26,7 +26,7 @@ parser.add_argument('--imageSize', type=int, default=32, help='the height / widt
 parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
 parser.add_argument('--ngf', type=int, default=48)
 parser.add_argument('--ndf', type=int, default=48)
-parser.add_argument('--niter', type=int, default=500, help='number of epochs to train for')
+parser.add_argument('--niter', type=int, default=1000, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0001, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
@@ -216,7 +216,7 @@ fixed_noise = Variable(fixed_noise)
 optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
-log_data = pd.DataFrame(np.nan, index=[], 
+log_data = pd.DataFrame(np.nan, index=[],
                         columns=['epoch', 'iter', 'D_loss', 'G_loss','D_x','D_G_z1','D_G_z2','perturbation_norm'])
 
 ### SET NAME OF LOG FILE HERE #####
@@ -269,7 +269,7 @@ for epoch in range(opt.niter):
         ###########################
         netG.zero_grad()
         output = output_fake + c_g * torch.norm(fake,2).pow(2)
-        errG = criterion(output, labelv)
+        errG = torch.mean(torch.sum(output,0))
         errG.backward()
         D_G_z2 = output.data.mean()
         optimizerG.step()
@@ -277,19 +277,19 @@ for epoch in range(opt.niter):
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-        
-        df2 = pd.DataFrame([[epoch,i,errD.data[0],errG.data[0],D_x,D_G_z1, 
-                             D_G_z2,torch.norm(fake,2).data[0]]], 
+
+        df2 = pd.DataFrame([[epoch,i,errD.data[0],errG.data[0],D_x,D_G_z1,
+                             D_G_z2,torch.norm(fake,2).data[0]]],
                                columns=['epoch', 'iter', 'D_loss', 'G_loss','D_x','D_G_z1','D_G_z2','perturbation_norm'])
         log_data = log_data.append(df2)
-        
+
         if i % 100 == 0:
-            vutils.save_image(real_cpu,
-                    '%s/real_samples.png' % opt.outf,
-                    normalize=True)
+            #vutils.save_image(real_cpu,
+            #        '%s/real_samples.png' % opt.outf,
+            #        normalize=True)
             fake = netG(Variable(inputv.grad.data)) + inputv
             vutils.save_image(fake.data,
-                    '%s/images/fake_samples_epoch_%03d.png' % (opt.outf, epoch),
+                    '%s/images/l2_fake_samples_epoch_%03d.png' % (opt.outf, epoch),
                     normalize=True)
 
     # do checkpointing
