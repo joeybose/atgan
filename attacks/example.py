@@ -13,7 +13,6 @@ import numpy as np
 
 use_cuda = torch.cuda.is_available()
 
-
 def load_cifar():
 	"""
 	Load and normalize the training and test data for CIFAR10
@@ -39,7 +38,7 @@ def load_cifar():
 	return trainloader, testloader
 
 
-def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25, freq=100):
+def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25, freq=10):
 	"""
 	Train the model with the optimizer and criterion for num_epochs epochs on data trainloader.
 	attacker is an object that produces adversial inputs given regular inputs.
@@ -71,12 +70,12 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25, fre
 			running_loss = loss.data[0]
 
 			# only perturb inputs on the last epoch, to save time
-			if (i+1) % freq == 0 and (epoch == num_epochs - 1):
-				adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
-				correct_adv += num_unperturbed
-				total_adv += labels.size(0)
+			# if (i+1) % freq == 0: #  and (epoch == num_epochs - 1):
+			adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model, optimizer)
+			correct_adv += num_unperturbed
+			total_adv += labels.size(0)
 
-			if (i+1) % 100 == 0:
+			if (i+1) % freq == 0:
 				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
 				running_loss = 0.0
 
@@ -121,12 +120,13 @@ if __name__ == "__main__":
 		cudnn.benchmark = True 
 
 	# use default hyperparams for best results!
-	attacker = attacks.FGSM()
-	attacker = attacks.CarliniWagner()
+	# attacker = attacks.FGSM()
+	# attacker = attacks.CarliniWagner()
+	attacker = attacks.DCGAN(train_adv=True)
 
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=100)
+	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
