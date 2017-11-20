@@ -1,8 +1,13 @@
 import torch
 import numpy as np
 from torch.autograd import Variable
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import sys
+
 
 def reduce_sum(x, keepdim=True):
 	for a in reversed(range(1, x.dim())):
@@ -24,7 +29,7 @@ class FGSM(object):
 	def __init__(self, epsilon=0.25):
 		self.epsilon = epsilon
 
-	def attack(self, inputs, labels, model):
+	def attack(self, inputs, labels, model, *args):
 		"""
 		Given a set of inputs and epsilon, return the perturbed inputs (as Variable objects),
 		the predictions for the inputs from the model, and the percentage of inputs 
@@ -144,7 +149,7 @@ class CarliniWagner(object):
 
 		return loss, dist, predicted, inputs_adv
 
-	def attack(self, inputs, labels, model):
+	def attack(self, inputs, labels, model, *args):
 		"""
 		Given a set of inputs, labels, and the model, return the perturbed inputs (as Variable objects).
 		inputs and labels should be Variable objects themselves.
@@ -270,3 +275,95 @@ class CarliniWagner(object):
 	
 		return o_best_attack, o_best_score, num_unperturbed
 	
+
+class DCGAN(object):
+	def __init__(self, num_channels=3, ngf=100, cg=0.1, learning_rate=1e-4, train_adv=False):
+		"""
+		Initialize a DCGAN. Perturbations from the GAN are added to the inputs to 
+		create adversarial attacks.
+
+		- num_channels is the number of channels in the input
+		- ngf is size of the conv layers
+		- cg is the normalization constant for perturbation (higher means encourage smaller perturbation)
+		- learning_rate is learning rate for generator optimizer
+		- train_adv is whether the model being attacked should be trained adversarially
+		"""
+		self.generator = nn.Sequential(
+			# input is (nc) x 32 x 32
+			nn.Conv2d(num_channels, ngf, 3, 1, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 48 x 32 x 32
+			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 48 x 32 x 32
+			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 48 x 32 x 32
+			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 48 x 32 x 32
+			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 48 x 32 x 32
+			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 48 x 32 x 32
+			nn.Conv2d(ngf, ngf, 1, 1, 0, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
+			# state size. 3 x 32 x 32
+			nn.Conv2d(ngf, num_channels, 1, 1, 0, bias=False),
+			nn.Tanh()
+		) 
+
+		self.cuda = torch.cuda.is_available()
+
+		if self.cuda:
+			self.generator.cuda()
+			self.generator = torch.nn.DataParallel(self.generator, device_ids=range(torch.cuda.device_count()))
+			cudnn.benchmark = True
+
+		self.criterion = nn.CrossEntropyLoss()
+		self.cg = cg
+		self.optimizer = optim.Adam(self.generator.parameters(), lr=learning_rate)
+		self.train_adv = train_adv
+
+	def attack(self, inputs, labels, model, model_optimizer, *args):
+                """
+                Given a set of inputs, return the perturbed inputs (as Variable objects),
+                the predictions for the inputs from the model, and the percentage of inputs 
+                unsucessfully perturbed (i.e., model accuracy).
+
+		If self.train_adversarial is True, train the model adversarially.
+	
+                The adversarial inputs is a python list of tensors.
+                The predictions is a numpy array of classes, with length equal to the number of inputs.
+                """
+                perturbation = self.generator(Variable(inputs.data)) 
+		adv_inputs = inputs + perturbation
+
+		predictions = model(adv_inputs) 
+		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * torch.norm(perturbation, 2).data[0] 
+
+		# optimizer step for the generator
+		self.optimizer.zero_grad()
+		loss.backward(retain_graph=True)
+		self.optimizer.step()
+
+		# optimizer step for the discriminator (if training adversarially)
+		if self.train_adv:
+			discriminator_loss = self.criterion(predictions, labels)
+			model_optimizer.zero_grad()
+			discriminator_loss.backward()
+			model_optimizer.step()
+
+		# print loss.data[0], torch.norm(perturbation, 2).data[0], torch.norm(inputs, 2).data[0]
+
+		# prep the predictions and inputs to be returned
+		predictions = torch.max(predictions.data, 1)[1].cpu().numpy()
+		num_unperturbed = (predictions == labels.data.cpu().numpy()).sum()
+                adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0)) ]
+		
+		return adv_inputs, predictions, num_unperturbed
+
+	def save(self, fn):
+		self.generator.save_state_dict(fn)
