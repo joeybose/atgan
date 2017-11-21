@@ -8,8 +8,11 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 from models.vgg import VGG
 from models.lenet import LeNet
+import models.resnet as resnet
+import models.densenet as densenet
 import attacks
 import numpy as np
+
 
 use_cuda = torch.cuda.is_available()
 
@@ -38,7 +41,7 @@ def load_cifar():
 	return trainloader, testloader
 
 
-def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25, freq=10):
+def train(model, optimizer, criterion, trainloader, attacker=None, num_epochs=25, freq=10):
 	"""
 	Train the model with the optimizer and criterion for num_epochs epochs on data trainloader.
 	attacker is an object that produces adversial inputs given regular inputs.
@@ -69,11 +72,12 @@ def train(model, optimizer, criterion, trainloader, attacker, num_epochs=25, fre
 			# print statistics
 			running_loss = loss.data[0]
 
-			# only perturb inputs on the last epoch, to save time
-			# if (i+1) % freq == 0: #  and (epoch == num_epochs - 1):
-			adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model, optimizer)
-			correct_adv += num_unperturbed
-			total_adv += labels.size(0)
+			if attacker:
+				# only perturb inputs on the last epoch, to save time
+				# if (i+1) % freq == 0: #  and (epoch == num_epochs - 1):
+				adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model, optimizer)
+				correct_adv += num_unperturbed
+				total_adv += labels.size(0)
 
 			if (i+1) % freq == 0:
 				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
@@ -113,21 +117,39 @@ def test(model, criterion, testloader, attacker):
 if __name__ == "__main__":
 	trainloader, testloader = load_cifar()
 	model = VGG('VGG16')
+	model2 = resnet.ResNet50() # densenet.densenet_cifar() # resnet.ResNet50() # LeNet() 
 
 	if use_cuda:
 		model.cuda()
 		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
+
+		model2 = model2.cuda()
+		model2 = torch.nn.DataParallel(model2, device_ids=range(torch.cuda.device_count()))
+
 		cudnn.benchmark = True 
 
 	# use default hyperparams for best results!
-	# attacker = attacks.FGSM()
-	# attacker = attacks.CarliniWagner()
-	attacker = attacks.DCGAN(train_adv=True)
+	attacker = attacks.FGSM()
+	# attacker = attacks.CarliniWagner(verbose=True)
+	# attacker = attacks.DCGAN(train_adv=False)
 
 	criterion = nn.CrossEntropyLoss()
+	
+	"""
+	# train first model adversarially
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
+	attacker.save('gan_generator.pth')
+	"""
+
+	# train second model normally
+	# attacker.load('gan_generator.pth')
+	optimizer2 = optim.SGD(model2.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+	train_acc, train_adv_acc = train(model2, optimizer2, criterion, trainloader, num_epochs=50)
+	test_acc, test_adv_acc = test(model2, criterion, testloader, attacker)
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
-	print 'Test accuracy of the network on the 10000 test images:', test_acc, test_adv_acc
+        print 'Test accuracy of the network on the 10000 test images:', test_acc, test_adv_acc
+	# print 'Train accuracy of the network on the 10000 test images:', train_acc2, train_adv_acc2
+	# print 'Test accuracy of the network on the 10000 test images:', test_acc2, test_adv_acc2
