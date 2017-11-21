@@ -45,7 +45,7 @@ class FGSM(object):
 		predictions = torch.max(model(adv_inputs).data, 1)[1].cpu().numpy()
 		num_unperturbed = (predictions == labels.data.cpu().numpy()).sum()
 		adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0)) ]	
-	
+
 		return adv_inputs, predictions, num_unperturbed
 
 
@@ -277,7 +277,7 @@ class CarliniWagner(object):
 	
 
 class DCGAN(object):
-	def __init__(self, num_channels=3, ngf=100, cg=0.1, learning_rate=1e-4, train_adv=False):
+	def __init__(self, num_channels=3, ngf=100, cg=0.2, learning_rate=1e-4, train_adv=False):
 		"""
 		Initialize a DCGAN. Perturbations from the GAN are added to the inputs to 
 		create adversarial attacks.
@@ -327,7 +327,7 @@ class DCGAN(object):
 		self.optimizer = optim.Adam(self.generator.parameters(), lr=learning_rate)
 		self.train_adv = train_adv
 
-	def attack(self, inputs, labels, model, model_optimizer, *args):
+	def attack(self, inputs, labels, model, model_optimizer=None, *args):
                 """
                 Given a set of inputs, return the perturbed inputs (as Variable objects),
                 the predictions for the inputs from the model, and the percentage of inputs 
@@ -342,7 +342,7 @@ class DCGAN(object):
 		adv_inputs = inputs + perturbation
 
 		predictions = model(adv_inputs) 
-		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * torch.norm(perturbation, 2).data[0] 
+		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (torch.norm(perturbation, 2).data[0] ** 2)
 
 		# optimizer step for the generator
 		self.optimizer.zero_grad()
@@ -350,12 +350,13 @@ class DCGAN(object):
 		self.optimizer.step()
 
 		# optimizer step for the discriminator (if training adversarially)
-		if self.train_adv:
+		if self.train_adv and model_optimizer:
 			discriminator_loss = self.criterion(predictions, labels)
 			model_optimizer.zero_grad()
 			discriminator_loss.backward()
 			model_optimizer.step()
 
+		# print perturbation.data.mean(), inputs.data.mean()
 		# print loss.data[0], torch.norm(perturbation, 2).data[0], torch.norm(inputs, 2).data[0]
 
 		# prep the predictions and inputs to be returned
@@ -366,4 +367,7 @@ class DCGAN(object):
 		return adv_inputs, predictions, num_unperturbed
 
 	def save(self, fn):
-		self.generator.save_state_dict(fn)
+		torch.save(self.generator.state_dict(), fn)
+
+	def load(self, fn):
+		self.generator.load_state_dict(torch.load(fn))
