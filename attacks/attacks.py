@@ -331,7 +331,7 @@ class DCGAN(object):
 		self.optimizer = optim.Adam(self.generator.parameters(), lr=learning_rate)
 		self.train_adv = train_adv
 
-	def attack(self, inputs, labels, model, model_optimizer=None, *args):
+	def attack(self, inputs, labels, model, model_optimizer=None, epsilon=1.0, *args):
                 """
                 Given a set of inputs, return the perturbed inputs (as Variable objects),
                 the predictions for the inputs from the model, and the percentage of inputs
@@ -342,12 +342,10 @@ class DCGAN(object):
                 The adversarial inputs is a python list of tensors.
                 The predictions is a numpy array of classes, with length equal to the number of inputs.
                 """
-                # perturbation = self.generator(Variable(inputs.data))
-                # epsilon = 0.16
-                # MSE_criterion = torch.nn.MSELoss()
-		# adv_inputs = inputs + epsilon*perturbation
+		perturbation = self.generator(Variable(inputs.data))
+		adv_inputs = inputs + epsilon * perturbation
+		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
 
-		adv_inputs = self.perturb(inputs)
 		predictions = model(adv_inputs)
 		loss = torch.exp(-1 * self.criterion(predictions, labels)) + \
                         self.cg * (torch.norm(perturbation, 2).data[0] ** 2) 
