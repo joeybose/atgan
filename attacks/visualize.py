@@ -18,12 +18,11 @@ attacker.load('gan_generator.pth')
 
 trainloader, testloader = example.load_cifar()
 
-for data, labels in testloader:
-	inputs, _ = data
+for inputs, labels in testloader:
 	inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
 	adv_inputs = attacker.perturb(inputs)
 
-	vutils.save_image(adv_inputs.data, 'images/VGG_gen_adv.png', normalize=True)
+	vutils.save_image(inputs.data, 'images/VGG_gen_adv.png')
 	break
 
 

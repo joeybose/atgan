@@ -25,12 +25,12 @@ def load_cifar():
 	    transforms.RandomCrop(32, padding=4),
 	    transforms.RandomHorizontalFlip(),
 	    transforms.ToTensor(),
-	    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+	    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 	])
 
 	transform_test = transforms.Compose([
 	    transforms.ToTensor(),
-	    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+	    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 	])
 
 	trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
@@ -129,20 +129,19 @@ if __name__ == "__main__":
 		cudnn.benchmark = True 
 
 	# use default hyperparams for best results!
-	attacker = attacks.FGSM()
+	# attacker = attacks.FGSM()
 	# attacker = attacks.CarliniWagner(verbose=True)
-	# attacker = attacks.DCGAN(train_adv=False)
+	attacker = attacks.DCGAN(train_adv=False)
 
 	criterion = nn.CrossEntropyLoss()
 	
-	"""
 	# train first model adversarially
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 	attacker.save('gan_generator.pth')
-	"""
 
+	"""
 	# train second model normally
 	# attacker.load('gan_generator.pth')
 	optimizer2 = optim.SGD(model2.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
@@ -151,5 +150,4 @@ if __name__ == "__main__":
 
 	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
         print 'Test accuracy of the network on the 10000 test images:', test_acc, test_adv_acc
-	# print 'Train accuracy of the network on the 10000 test images:', train_acc2, train_adv_acc2
-	# print 'Test accuracy of the network on the 10000 test images:', test_acc2, test_adv_acc2
+	"""

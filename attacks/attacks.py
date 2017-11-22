@@ -38,15 +38,19 @@ class FGSM(object):
 		The adversarial inputs is a python list of tensors.
 		The predictions is a numpy array of classes, with length equal to the number of inputs.
 		"""
-		adv_inputs = inputs.data + self.epsilon * torch.sign(inputs.grad.data)
-		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
-		adv_inputs = Variable(adv_inputs, requires_grad=False)
-
+		adv_inputs = self.perturb(inputs)
 		predictions = torch.max(model(adv_inputs).data, 1)[1].cpu().numpy()
 		num_unperturbed = (predictions == labels.data.cpu().numpy()).sum()
-		adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0)) ]
-
 		return adv_inputs, predictions, num_unperturbed
+
+	def perturb(self, inputs):
+		"""
+		Given a set of inputs and epsilon, return the perturbed inputs (as Variable objects).
+		"""
+		adv_inputs = inputs.data + self.epsilon * torch.sign(inputs.grad.data)
+                adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
+                adv_inputs = Variable(adv_inputs, requires_grad=False)
+		return adv_inputs
 
 
 class CarliniWagner(object):
@@ -338,14 +342,15 @@ class DCGAN(object):
                 The adversarial inputs is a python list of tensors.
                 The predictions is a numpy array of classes, with length equal to the number of inputs.
                 """
-                perturbation = self.generator(Variable(inputs.data))
-                epsilon = 0.16
-                MSE_criterion = torch.nn.MSELoss()
-		adv_inputs = inputs + epsilon*perturbation
+                # perturbation = self.generator(Variable(inputs.data))
+                # epsilon = 0.16
+                # MSE_criterion = torch.nn.MSELoss()
+		# adv_inputs = inputs + epsilon*perturbation
+
+		adv_inputs = self.perturb(inputs)
 		predictions = model(adv_inputs)
 		loss = torch.exp(-1 * self.criterion(predictions, labels)) + \
-                        self.cg * (torch.norm(perturbation, 2).data[0] ** 2) # +\
-#                        + MSE_criterion(inputs,adv_inputs)
+                        self.cg * (torch.norm(perturbation, 2).data[0] ** 2) 
 
 		# optimizer step for the generator
 		self.optimizer.zero_grad()
@@ -370,7 +375,9 @@ class DCGAN(object):
 
 	def perturb(self, inputs, epsilon=1.0):
 		perturbation = self.generator(Variable(inputs.data))
-		adv_inputs = inputs + perturbation
+		adv_inputs = inputs + epsilon * perturbation
+		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
+
 		return adv_inputs
 
 	def save(self, fn):
