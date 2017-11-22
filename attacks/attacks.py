@@ -344,8 +344,8 @@ class DCGAN(object):
 		adv_inputs = inputs + epsilon*perturbation
 		predictions = model(adv_inputs)
 		loss = torch.exp(-1 * self.criterion(predictions, labels)) + \
-                        self.cg * (torch.norm(perturbation, 2).data[0] ** 2) +\
-                        + MSE_criterion(inputs,adv_inputs)
+                        self.cg * (torch.norm(perturbation, 2).data[0] ** 2) # +\
+#                        + MSE_criterion(inputs,adv_inputs)
 
 		# optimizer step for the generator
 		self.optimizer.zero_grad()
@@ -365,9 +365,13 @@ class DCGAN(object):
 		# prep the predictions and inputs to be returned
 		predictions = torch.max(predictions.data, 1)[1].cpu().numpy()
 		num_unperturbed = (predictions == labels.data.cpu().numpy()).sum()
-                #adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0)) ]
 
 		return adv_inputs, predictions, num_unperturbed
+
+	def perturb(self, inputs, epsilon=1.0):
+		perturbation = self.generator(Variable(inputs.data))
+		adv_inputs = inputs + perturbation
+		return adv_inputs
 
 	def save(self, fn):
 		torch.save(self.generator.state_dict(), fn)
