@@ -10,6 +10,7 @@ from models.vgg import VGG
 from models.lenet import LeNet
 import models.resnet as resnet
 import models.densenet as densenet
+import models.alexnet as alexnet
 import attacks
 import numpy as np
 
@@ -25,12 +26,12 @@ def load_cifar():
 	    transforms.RandomCrop(32, padding=4),
 	    transforms.RandomHorizontalFlip(),
 	    transforms.ToTensor(),
-	    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+	    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 	])
 
 	transform_test = transforms.Compose([
 	    transforms.ToTensor(),
-	    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+	    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 	])
 
 	trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
@@ -113,43 +114,71 @@ def test(model, criterion, testloader, attacker):
 
 	return correct/total, correct_adv/total
 
+def prep(model):
+	if model and use_cuda:
+		model.cuda()
+		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
+		cudnn.benchmark = True
+
+	return model
+
 
 if __name__ == "__main__":
 	trainloader, testloader = load_cifar()
-	model = VGG('VGG16')
-	model2 = resnet.ResNet50() # densenet.densenet_cifar() # resnet.ResNet50() # LeNet() 
+	criterion = nn.CrossEntropyLoss()
 
-	if use_cuda:
-		model.cuda()
-		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
+	architectures = [
+#		(VGG, 'VGG16', 50),
+		(resnet.ResNet18, 'res16', 50),
+		(densenet.densenet_cifar, 'dense121', 50),
+		(alexnet.AlexNet, 'alex', 50),
+		(LeNet, 'lenet', 250)
+	]
 
-		model2 = model2.cuda()
-		model2 = torch.nn.DataParallel(model2, device_ids=range(torch.cuda.device_count()))
+	for init_func, name, epochs in architectures:
+		for tr_adv in [False, True]:
+			print name, tr_adv
+			model = prep(init_func())
+			attacker = attacks.DCGAN(train_adv=tr_adv)
 
-		cudnn.benchmark = True 
+			optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+			train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=epochs)
+			test_acc, test_adv_acc = test(model, criterion, testloader, attacker)		
+
+			suffix = '_AT' if tr_adv else ''
+			attacker.save('saved/{0}{1}_attacker_0.005.pth'.format(name, suffix))
+			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
+
+	"""
+	model = prep(VGG('VGG16'))
+	model2 = prep(VGG('VGG16'))
 
 	# use default hyperparams for best results!
-	attacker = attacks.FGSM()
+	# attacker = attacks.FGSM()
 	# attacker = attacks.CarliniWagner(verbose=True)
-	# attacker = attacks.DCGAN(train_adv=False)
+	attacker = attacks.DCGAN(train_adv=False)
 
 	criterion = nn.CrossEntropyLoss()
-	
-	"""
+
 	# train first model adversarially
 	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
 	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
-	attacker.save('gan_generator.pth')
+	attacker.save('VGG_attack_0.005.pth')
+	torch.save(model.state_dict(), 'VGG_50.pth')
 	"""
 
+	"""
 	# train second model normally
-	# attacker.load('gan_generator.pth')
+	# attacker.load('VGG_attack_0.005.pth')
+	model2.load_state_dict(torch.load('VGG_50.pth'))	
+
 	optimizer2 = optim.SGD(model2.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model2, optimizer2, criterion, trainloader, num_epochs=50)
+	torch.save(model2.state_dict(), 'resnet_50.pth')
+
 	test_acc, test_adv_acc = test(model2, criterion, testloader, attacker)
 
-	print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
+	# print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
         print 'Test accuracy of the network on the 10000 test images:', test_acc, test_adv_acc
-	# print 'Train accuracy of the network on the 10000 test images:', train_acc2, train_adv_acc2
-	# print 'Test accuracy of the network on the 10000 test images:', test_acc2, test_adv_acc2
+	"""
