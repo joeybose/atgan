@@ -1,0 +1,6 @@
+#!/bin/bash
+export PYTHONPATH=/u/kawin/local/lib/python2.7/site-packages:$PYTHONPATH
+export CUDA_HOME=/pkgs_local/cuda-8.0
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/pkgs_local/cuda-8.0/lib64
+pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl
+easy_install --prefix=$HOME/local torchvision
