@@ -36,10 +36,10 @@ def load_cifar():
 	])
 
 	trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-	trainloader = torch.utils.data.DataLoader(trainset, batch_size=100, shuffle=True, num_workers=2)
+	trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
 
 	testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-	testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+	testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=2)
 	return trainloader, testloader
 
 
@@ -50,18 +50,18 @@ def train(model, optimizer, criterion, trainloader, attacker=None, num_epochs=25
 	Return the accuracy on the normal inputs and on the perturbed inputs.
 
 	To save time, only perturb inputs on the last epoch, at the frequency freq.
-	""" 
+	"""
 	for epoch in range(num_epochs):
 		running_loss = 0.0
 		total, correct, correct_adv, total_adv  = 0.0, 0.0, 0.0, 1.0
-		
+
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
 			inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
 			labels = Variable((labels.cuda() if use_cuda else labels), requires_grad=False)
 
 			y_hat = model(inputs)
-			loss = criterion(y_hat, labels)			
+			loss = criterion(y_hat, labels)
 
 			optimizer.zero_grad()
 			loss.backward()
@@ -85,10 +85,10 @@ def train(model, optimizer, criterion, trainloader, attacker=None, num_epochs=25
 				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
 				running_loss = 0.0
 
-	return correct/total, correct_adv/total_adv 
+	return correct/total, correct_adv/total_adv
 
 
-def test(model, criterion, testloader, attacker):
+def test(model, criterion, testloader, attacker, name):
 	"""
 	Test the model with the data from testloader.
 	attacker is an object that produces adversial inputs given regular inputs.
@@ -106,13 +106,19 @@ def test(model, criterion, testloader, attacker):
 		loss.backward()
 
 		predicted = torch.max(y_hat.data, 1)[1]
-		correct += predicted.eq(labels.data).sum() 
+		correct += predicted.eq(labels.data).sum()
 
-		adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
+		_, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
+	        adv_inputs  = attacker.perturb(inputs,epsilon=epsilon)
 		correct_adv += num_unperturbed
 
 		total += labels.size(0)
 
+        fake = adv_inputs
+        samples_name = 'images/'+name+'_samples.png'
+        vutils.save_image(fake.data,samples_name)
+        print('Test Acc Acc: %.4f | Test Attacked Acc; %.4f'\
+                % (100.*correct/total, 100.*correct_adv/total))
 	return correct/total, correct_adv/total
 
 def prep(model):
@@ -145,7 +151,7 @@ if __name__ == "__main__":
 
 			optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 			train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=epochs)
-			test_acc, test_adv_acc = test(model, criterion, testloader, attacker)		
+			test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
 
 			suffix = '_AT' if tr_adv else ''
 			attacker.save('saved/{0}{1}_attacker_0.005.pth'.format(name, suffix))
@@ -173,7 +179,7 @@ if __name__ == "__main__":
 	"""
 	# train second model normally
 	# attacker.load('VGG_attack_0.005.pth')
-	model2.load_state_dict(torch.load('VGG_50.pth'))	
+	model2.load_state_dict(torch.load('VGG_50.pth'))
 
 	optimizer2 = optim.SGD(model2.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 	train_acc, train_adv_acc = train(model2, optimizer2, criterion, trainloader, num_epochs=50)
