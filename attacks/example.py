@@ -11,6 +11,7 @@ from models.lenet import LeNet
 import models.resnet as resnet
 import models.densenet as densenet
 import models.alexnet as alexnet
+import models.googlenet as googlenet
 import attacks
 import numpy as np
 
@@ -132,6 +133,7 @@ if __name__ == "__main__":
 		(resnet.ResNet18, 'res16', 50),
 		(densenet.densenet_cifar, 'dense121', 50),
 		(alexnet.AlexNet, 'alex', 50),
+		(googlenet.GoogLeNet, 'googlenet', 50),
 		(LeNet, 'lenet', 250)
 	]
 
