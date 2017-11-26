@@ -43,7 +43,7 @@ def load_cifar():
 	return trainloader, testloader
 
 
-def train(model, optimizer, criterion, trainloader, attacker=None, num_epochs=25, freq=10):
+def train(model, optimizer, criterion, trainloader, architecture, attacker=None, num_epochs=25, freq=10):
 	"""
 	Train the model with the optimizer and criterion for num_epochs epochs on data trainloader.
 	attacker is an object that produces adversial inputs given regular inputs.
@@ -82,8 +82,9 @@ def train(model, optimizer, criterion, trainloader, attacker=None, num_epochs=25
 				total_adv += labels.size(0)
 
 			if (i+1) % freq == 0:
-				print '[%d, %5d] loss: %.4f' % (epoch + 1, i + 1, running_loss / 2), correct/total, correct_adv/total_adv
-				running_loss = 0.0
+                            print '[%s: %d, %5d] loss: %.4f' % (architecture,epoch + 1, i + 1, running_loss / 2),\
+                                    correct/total, correct_adv/total_adv
+                            running_loss = 0.0
 
 	return correct/total, correct_adv/total_adv
 
@@ -95,7 +96,7 @@ def test(model, criterion, testloader, attacker, name):
 	Return the accuracy on the normal inputs and the unperturbed inputs.
 	"""
 	correct, correct_adv, total = 0.0, 0.0, 0.0
-
+        epsilon = 1.0
 	for data in testloader:
 		inputs, labels = data
 		inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
@@ -136,10 +137,10 @@ if __name__ == "__main__":
 
 	architectures = [
 #		(VGG, 'VGG16', 50),
-		(resnet.ResNet18, 'res16', 50),
-		(densenet.densenet_cifar, 'dense121', 50),
-		(alexnet.AlexNet, 'alex', 50),
-		(googlenet.GoogLeNet, 'googlenet', 50),
+		(resnet.ResNet18, 'res16', 500),
+		(densenet.densenet_cifar, 'dense121', 500),
+		(alexnet.AlexNet, 'alex', 500),
+		(googlenet.GoogLeNet, 'googlenet', 500),
 		(LeNet, 'lenet', 250)
 	]
 
@@ -149,8 +150,9 @@ if __name__ == "__main__":
 			model = prep(init_func())
 			attacker = attacks.DCGAN(train_adv=tr_adv)
 
-			optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-			train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=epochs)
+			optimizer = optim.Adam(model.parameters(), lr=1e-3)
+			train_acc, train_adv_acc = train(model, optimizer,\
+                                criterion, trainloader, name, attacker, num_epochs=epochs)
 			test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
 
 			suffix = '_AT' if tr_adv else ''

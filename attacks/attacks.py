@@ -373,9 +373,9 @@ class DCGAN(object):
 
 		return adv_inputs, predictions, num_unperturbed
 
-	def perturb(self, inputs):
+	def perturb(self, inputs, epsilon=1.0):
 		perturbation = self.generator(Variable(inputs.data))
-		adv_inputs = inputs + perturbation
+		adv_inputs = inputs + epsilon*perturbation
 		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
 		return adv_inputs
 
