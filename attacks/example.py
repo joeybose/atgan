@@ -35,15 +35,15 @@ def load_cifar():
 	    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 	])
 
-	trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-	trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
+	trainset = torchvision.datasets.CIFAR10(root='/scratch/data', train=True, download=True, transform=transform_train)
+	trainloader = torch.utils.data.DataLoader(trainset,batch_size=2048,shuffle=True, num_workers=8)
 
-	testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-	testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=2)
+	testset = torchvision.datasets.CIFAR10(root='/scratch/data', train=False, download=True, transform=transform_test)
+	testloader = torch.utils.data.DataLoader(testset,batch_size=2048,shuffle=False, num_workers=8)
 	return trainloader, testloader
 
 
-def train(model, optimizer, criterion, trainloader, architecture, attacker=None, num_epochs=25, freq=10):
+def train(model, optimizer, criterion, trainloader, architecture, attacker=None, num_epochs=25, freq=10, early_stopping=True):
 	"""
 	Train the model with the optimizer and criterion for num_epochs epochs on data trainloader.
 	attacker is an object that produces adversial inputs given regular inputs.
@@ -54,7 +54,7 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 	for epoch in range(num_epochs):
 		running_loss = 0.0
 		total, correct, correct_adv, total_adv  = 0.0, 0.0, 0.0, 1.0
-
+                early_stop_param = 0.002
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
 			inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
@@ -84,6 +84,10 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 			if (i+1) % freq == 0:
                             print '[%s: %d, %5d] loss: %.4f' % (architecture,epoch + 1, i + 1, running_loss / 2),\
                                     correct/total, correct_adv/total_adv
+                            if early_stopping:
+                                if running_loss / 2 < early_stop_param:
+                                    print("Early Stopping !!!!!!!!!!")
+                                    break
                             running_loss = 0.0
 
 	return correct/total, correct_adv/total_adv
@@ -134,10 +138,10 @@ def prep(model):
 if __name__ == "__main__":
 	trainloader, testloader = load_cifar()
 	criterion = nn.CrossEntropyLoss()
-
+        do_train = True
 	architectures = [
 #		(VGG, 'VGG16', 50),
-		(resnet.ResNet18, 'res16', 500),
+		(resnet.ResNet18, 'res18', 500),
 		(densenet.densenet_cifar, 'dense121', 500),
 		(alexnet.AlexNet, 'alex', 500),
 		(googlenet.GoogLeNet, 'googlenet', 500),
@@ -150,11 +154,13 @@ if __name__ == "__main__":
 			model = prep(init_func())
 			attacker = attacks.DCGAN(train_adv=tr_adv)
 
-			optimizer = optim.Adam(model.parameters(), lr=1e-3)
-			train_acc, train_adv_acc = train(model, optimizer,\
-                                criterion, trainloader, name, attacker, num_epochs=epochs)
-			test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
-
+			optimizer = optim.Adam(model.parameters(), lr=1e-4)
+                        if do_train:
+                            train_acc, train_adv_acc = train(model, optimizer,\
+                                    criterion, trainloader, name, attacker, num_epochs=epochs)
+                        else:
+			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
+                        pdb.set_trace()
 			suffix = '_AT' if tr_adv else ''
 			attacker.save('saved/{0}{1}_attacker_0.005.pth'.format(name, suffix))
 			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
