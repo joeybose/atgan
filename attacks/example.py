@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import torchvision.utils as vutils
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,10 +15,12 @@ import models.alexnet as alexnet
 import models.googlenet as googlenet
 import attacks
 import numpy as np
-
+import pdb
+import pandas as pd
+import os
 
 use_cuda = torch.cuda.is_available()
-
+i = 0 # Epsilon counter for logging
 def load_cifar():
 	"""
 	Load and normalize the training and test data for CIFAR10
@@ -36,10 +39,10 @@ def load_cifar():
 	])
 
 	trainset = torchvision.datasets.CIFAR10(root='/scratch/data', train=True, download=True, transform=transform_train)
-	trainloader = torch.utils.data.DataLoader(trainset,batch_size=2048,shuffle=True, num_workers=8)
+	trainloader = torch.utils.data.DataLoader(trainset,batch_size=1024,shuffle=True, num_workers=8)
 
 	testset = torchvision.datasets.CIFAR10(root='/scratch/data', train=False, download=True, transform=transform_test)
-	testloader = torch.utils.data.DataLoader(testset,batch_size=2048,shuffle=False, num_workers=8)
+	testloader = torch.utils.data.DataLoader(testset,batch_size=128,shuffle=False, num_workers=8)
 	return trainloader, testloader
 
 
@@ -54,7 +57,7 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 	for epoch in range(num_epochs):
 		running_loss = 0.0
 		total, correct, correct_adv, total_adv  = 0.0, 0.0, 0.0, 1.0
-                early_stop_param = 0.002
+                early_stop_param = 0.01
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
 			inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
@@ -85,7 +88,7 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
                             print '[%s: %d, %5d] loss: %.4f' % (architecture,epoch + 1, i + 1, running_loss / 2),\
                                     correct/total, correct_adv/total_adv
                             if early_stopping:
-                                if running_loss / 2 < early_stop_param:
+                                if running_loss < early_stop_param:
                                     print("Early Stopping !!!!!!!!!!")
                                     break
                             running_loss = 0.0
@@ -93,37 +96,44 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 	return correct/total, correct_adv/total_adv
 
 
-def test(model, criterion, testloader, attacker, name):
+def test(model, criterion, testloader, attacker, model_name, att_name):
 	"""
 	Test the model with the data from testloader.
 	attacker is an object that produces adversial inputs given regular inputs.
 	Return the accuracy on the normal inputs and the unperturbed inputs.
 	"""
-	correct, correct_adv, total = 0.0, 0.0, 0.0
-        epsilon = 1.0
-	for data in testloader:
-		inputs, labels = data
-		inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
-		labels = Variable((labels.cuda() if use_cuda else labels), requires_grad=False)
+        epsilons = [0.0,0.2,0.4,0.6,0.8,1.0]
+        resultsDF = pd.DataFrame(columns=('Model','Attacker','Epsilon','Test_acc','Test_att_acc'))
+        global i
+        for epsilon in epsilons:
+            correct, correct_adv, total = 0.0, 0.0, 0.0
+            for data in testloader:
+                    inputs, labels = data
+                    inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
+                    labels = Variable((labels.cuda() if use_cuda else labels), requires_grad=False)
+                    y_hat = model(inputs)
+                    loss = criterion(y_hat, labels)
+                    loss.backward()
 
-		y_hat = model(inputs)
-		loss = criterion(y_hat, labels)
-		loss.backward()
+                    predicted = torch.max(y_hat.data, 1)[1]
+                    correct += predicted.eq(labels.data).sum()
 
-		predicted = torch.max(y_hat.data, 1)[1]
-		correct += predicted.eq(labels.data).sum()
+                    _, adv_labels, num_unperturbed = attacker.attack(inputs,labels, model, epsilon)
+                    adv_inputs  = attacker.perturb(inputs,epsilon=epsilon)
+                    correct_adv += num_unperturbed
 
-		_, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
-	        adv_inputs  = attacker.perturb(inputs,epsilon=epsilon)
-		correct_adv += num_unperturbed
+                    total += labels.size(0)
 
-		total += labels.size(0)
-
-        fake = adv_inputs
-        samples_name = 'images/'+name+'_samples.png'
-        vutils.save_image(fake.data,samples_name)
-        print('Test Acc Acc: %.4f | Test Attacked Acc; %.4f'\
-                % (100.*correct/total, 100.*correct_adv/total))
+            fake = adv_inputs
+            samples_name = 'images/'+name+str(epsilon) +'_samples.png'
+            vutils.save_image(fake.data,samples_name)
+            print('Test Acc Acc: %.4f | Test Attacked Acc; %.4f'\
+                    % (100.*correct/total, 100.*correct_adv/total))
+            resultsDF.loc[i] = [model_name,att_name,epsilon,correct/total,correct_adv/total]
+            i = i + 1
+        resultsDF.to_csv('DCGAN_attack_results.csv',mode='a',\
+                 header=(not os.path.exists('DCGAN_attack_results.csv')))
+        pdb.set_trace()
 	return correct/total, correct_adv/total
 
 def prep(model):
@@ -138,13 +148,13 @@ def prep(model):
 if __name__ == "__main__":
 	trainloader, testloader = load_cifar()
 	criterion = nn.CrossEntropyLoss()
-        do_train = True
+        do_train = False
 	architectures = [
-#		(VGG, 'VGG16', 50),
-		(resnet.ResNet18, 'res18', 500),
-		(densenet.densenet_cifar, 'dense121', 500),
-		(alexnet.AlexNet, 'alex', 500),
-		(googlenet.GoogLeNet, 'googlenet', 500),
+		#(VGG, 'VGG16', 50),
+		#(resnet.ResNet18, 'res18', 100),
+		(densenet.densenet_cifar, 'dense121', 100),
+		(alexnet.AlexNet, 'alex', 100),
+		(googlenet.GoogLeNet, 'googlenet', 100),
 		(LeNet, 'lenet', 250)
 	]
 
@@ -158,12 +168,19 @@ if __name__ == "__main__":
                         if do_train:
                             train_acc, train_adv_acc = train(model, optimizer,\
                                     criterion, trainloader, name, attacker, num_epochs=epochs)
+                            suffix = '_AT' if tr_adv else ''
+                            attacker.save('saved/{0}{1}_nodrop_joey_attacker_0.0010.pth'.format(name, suffix))
+                            torch.save(model.state_dict(),'saved/{0}{1}_no_drop_joey.pth'.format(name, suffix))
                         else:
-			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
-                        pdb.set_trace()
-			suffix = '_AT' if tr_adv else ''
-			attacker.save('saved/{0}{1}_attacker_0.005.pth'.format(name, suffix))
-			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
+                            attacker.load('saved/res18_nodrop_joey_attacker_0.0010.pth')
+                            model.load_state_dict(torch.load('saved/dense121_joey.pth'))
+                            tr_adv = False
+                            suffix = '_AT' if tr_adv else ''
+                            attacker_name = 'res18_no_drop' + suffix
+                            name = name + suffix
+			    test_acc, test_adv_acc = test(model,criterion,testloader,\
+                                    attacker, name, attacker_name)
+
 
 	"""
 	model = prep(VGG('VGG16'))

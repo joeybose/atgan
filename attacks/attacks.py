@@ -292,19 +292,19 @@ class DCGAN(object):
 			# input is (nc) x 32 x 32
 			nn.Conv2d(num_channels, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout2d(),
+                        #nn.Dropout2d(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout2d(),
+                        #nn.Dropout2d(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout(),
+                        #nn.Dropout(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout(),
+                        #nn.Dropout(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
@@ -331,7 +331,7 @@ class DCGAN(object):
 		self.optimizer = optim.Adam(self.generator.parameters(), lr=learning_rate)
 		self.train_adv = train_adv
 
-	def attack(self, inputs, labels, model, model_optimizer=None, *args):
+	def attack(self, inputs, labels, model, epsilon=1.0, model_optimizer=None, *args):
                 """
                 Given a set of inputs, return the perturbed inputs (as Variable objects),
                 the predictions for the inputs from the model, and the percentage of inputs
@@ -343,13 +343,13 @@ class DCGAN(object):
                 The predictions is a numpy array of classes, with length equal to the number of inputs.
                 """
                 perturbation = self.generator(Variable(inputs.data))
-		adv_inputs = inputs + perturbation
+		adv_inputs = inputs + epsilon*perturbation
 		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
 
 		predictions = model(adv_inputs)
 		# exponent value (p) in the norm needs to be 4 or higher! IMPORTANT!
 		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (torch.norm(perturbation, 4))
-		print (torch.norm(perturbation, 2) ** 1).data[0]
+                #print (torch.norm(perturbation, 2) ** 1).data[0]
 
 		# optimizer step for the generator
 		self.optimizer.zero_grad()
