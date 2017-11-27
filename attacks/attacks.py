@@ -277,7 +277,7 @@ class CarliniWagner(object):
 
 
 class DCGAN(object):
-	def __init__(self, num_channels=3, ngf=100, cg=0.005, learning_rate=1e-4, train_adv=False):
+	def __init__(self, num_channels=3, ngf=100, cg=0.01, learning_rate=1e-4, train_adv=False):
 		"""
 		Initialize a DCGAN. Perturbations from the GAN are added to the inputs to
 		create adversarial attacks.
@@ -348,7 +348,7 @@ class DCGAN(object):
 
 		predictions = model(adv_inputs)
 		# exponent value (p) in the norm needs to be 4 or higher! IMPORTANT!
-		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (torch.norm(perturbation, 4))
+		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * torch.norm(perturbation, 4).clamp(min=0.01)
 		print (torch.norm(perturbation, 2) ** 1).data[0]
 
 		# optimizer step for the generator
