@@ -140,7 +140,7 @@ if __name__ == "__main__":
 	criterion = nn.CrossEntropyLoss()
         do_train = True
 	architectures = [
-#		(VGG, 'VGG16', 50),
+		(VGG, 'VGG16', 50),
 		(resnet.ResNet18, 'res18', 500),
 		(densenet.densenet_cifar, 'dense121', 500),
 		(alexnet.AlexNet, 'alex', 500),
@@ -162,7 +162,7 @@ if __name__ == "__main__":
 			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
                         pdb.set_trace()
 			suffix = '_AT' if tr_adv else ''
-			attacker.save('saved/{0}{1}_attacker_0.005.pth'.format(name, suffix))
+			attacker.save('saved/{0}{1}_attacker_0.01.pth'.format(name, suffix))
 			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
 
 	"""
