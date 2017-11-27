@@ -277,7 +277,7 @@ class CarliniWagner(object):
 
 
 class DCGAN(object):
-	def __init__(self, num_channels=3, ngf=100, cg=0.01, learning_rate=1e-4, train_adv=False):
+	def __init__(self, num_channels=3, ngf=100, cg=0.005, learning_rate=1e-4, train_adv=False):
 		"""
 		Initialize a DCGAN. Perturbations from the GAN are added to the inputs to
 		create adversarial attacks.
@@ -296,15 +296,15 @@ class DCGAN(object):
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout2d(),
+                        # nn.Dropout2d(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout(),
+                        # nn.Dropout(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout(),
+                        # nn.Dropout(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),

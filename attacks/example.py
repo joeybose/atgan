@@ -35,11 +35,11 @@ def load_cifar():
 	    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 	])
 
-	trainset = torchvision.datasets.CIFAR10(root='/scratch/data', train=True, download=True, transform=transform_train)
-	trainloader = torch.utils.data.DataLoader(trainset,batch_size=2048,shuffle=True, num_workers=8)
+	trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+	trainloader = torch.utils.data.DataLoader(trainset, batch_size=100, shuffle=True, num_workers=2)
 
-	testset = torchvision.datasets.CIFAR10(root='/scratch/data', train=False, download=True, transform=transform_test)
-	testloader = torch.utils.data.DataLoader(testset,batch_size=2048,shuffle=False, num_workers=8)
+	testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+	testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
 	return trainloader, testloader
 
 
@@ -138,7 +138,7 @@ def prep(model):
 if __name__ == "__main__":
 	trainloader, testloader = load_cifar()
 	criterion = nn.CrossEntropyLoss()
-        do_train = True
+
 	architectures = [
 		(VGG, 'VGG16', 50),
 		(resnet.ResNet18, 'res18', 500),
@@ -148,18 +148,20 @@ if __name__ == "__main__":
 		(LeNet, 'lenet', 250)
 	]
 
+	do_train = True
+
 	for init_func, name, epochs in architectures:
 		for tr_adv in [False, True]:
 			print name, tr_adv
 			model = prep(init_func())
 			attacker = attacks.DCGAN(train_adv=tr_adv)
 
-			optimizer = optim.Adam(model.parameters(), lr=1e-4)
-                        if do_train:
-                            train_acc, train_adv_acc = train(model, optimizer,\
-                                    criterion, trainloader, name, attacker, num_epochs=epochs)
+                     	if do_train:
+			    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+                            train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, name, attacker, num_epochs=epochs)
                         else:
 			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
+
                         pdb.set_trace()
 			suffix = '_AT' if tr_adv else ''
 			attacker.save('saved/{0}{1}_attacker_0.01.pth'.format(name, suffix))
