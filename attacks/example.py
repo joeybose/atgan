@@ -150,11 +150,19 @@ if __name__ == "__main__":
 	criterion = nn.CrossEntropyLoss()
         do_train = False
 	architectures = [
+<<<<<<< HEAD
 		#(VGG, 'VGG16', 50),
 		#(resnet.ResNet18, 'res18', 100),
 		(densenet.densenet_cifar, 'dense121', 100),
 		(alexnet.AlexNet, 'alex', 100),
 		(googlenet.GoogLeNet, 'googlenet', 100),
+=======
+		(VGG, 'VGG16', 50),
+		(resnet.ResNet18, 'res18', 500),
+		(densenet.densenet_cifar, 'dense121', 500),
+		(alexnet.AlexNet, 'alex', 500),
+		(googlenet.GoogLeNet, 'googlenet', 500),
+>>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
 		(LeNet, 'lenet', 250)
 	]
 
@@ -172,6 +180,7 @@ if __name__ == "__main__":
                             attacker.save('saved/{0}{1}_nodrop_joey_attacker_0.0010.pth'.format(name, suffix))
                             torch.save(model.state_dict(),'saved/{0}{1}_no_drop_joey.pth'.format(name, suffix))
                         else:
+<<<<<<< HEAD
                             attacker.load('saved/res18_nodrop_joey_attacker_0.0010.pth')
                             model.load_state_dict(torch.load('saved/dense121_joey.pth'))
                             tr_adv = False
@@ -181,6 +190,13 @@ if __name__ == "__main__":
 			    test_acc, test_adv_acc = test(model,criterion,testloader,\
                                     attacker, name, attacker_name)
 
+=======
+			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
+                        pdb.set_trace()
+			suffix = '_AT' if tr_adv else ''
+			attacker.save('saved/{0}{1}_attacker_0.01.pth'.format(name, suffix))
+			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
+>>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
 
 	"""
 	model = prep(VGG('VGG16'))
