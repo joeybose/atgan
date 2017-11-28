@@ -1,13 +1,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
-<<<<<<< HEAD
-<<<<<<< HEAD
 import torchvision.utils as vutils
-=======
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,25 +15,13 @@ import models.alexnet as alexnet
 import models.googlenet as googlenet
 import attacks
 import numpy as np
-<<<<<<< HEAD
-<<<<<<< HEAD
 import pdb
 import pandas as pd
 import os
 
 use_cuda = torch.cuda.is_available()
 i = 0 # Epsilon counter for logging
-=======
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 
-
-use_cuda = torch.cuda.is_available()
-
-<<<<<<< HEAD
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 def load_cifar():
 	"""
 	Load and normalize the training and test data for CIFAR10
@@ -58,29 +40,10 @@ def load_cifar():
 	])
 
 	trainset = torchvision.datasets.CIFAR10(root='/scratch/data', train=True, download=True, transform=transform_train)
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	trainloader = torch.utils.data.DataLoader(trainset,batch_size=1024,shuffle=True, num_workers=8)
 
 	testset = torchvision.datasets.CIFAR10(root='/scratch/data', train=False, download=True, transform=transform_test)
 	testloader = torch.utils.data.DataLoader(testset,batch_size=128,shuffle=False, num_workers=8)
-=======
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-	trainloader = torch.utils.data.DataLoader(trainset,batch_size=2048,shuffle=True, num_workers=8)
-
-	testset = torchvision.datasets.CIFAR10(root='/scratch/data', train=False, download=True, transform=transform_test)
-	testloader = torch.utils.data.DataLoader(testset,batch_size=2048,shuffle=False, num_workers=8)
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 	return trainloader, testloader
 
 
@@ -95,19 +58,7 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 	for epoch in range(num_epochs):
 		running_loss = 0.0
 		total, correct, correct_adv, total_adv  = 0.0, 0.0, 0.0, 1.0
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
                 early_stop_param = 0.01
-=======
-                early_stop_param = 0.002
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
-                early_stop_param = 0.002
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
-                early_stop_param = 0.002
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
 			inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
@@ -138,19 +89,7 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
                             print '[%s: %d, %5d] loss: %.4f' % (architecture,epoch + 1, i + 1, running_loss / 2),\
                                     correct/total, correct_adv/total_adv
                             if early_stopping:
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
                                 if running_loss < early_stop_param:
-=======
-                                if running_loss / 2 < early_stop_param:
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
-                                if running_loss / 2 < early_stop_param:
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
-                                if running_loss / 2 < early_stop_param:
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
                                     print("Early Stopping !!!!!!!!!!")
                                     break
                             running_loss = 0.0
@@ -158,26 +97,12 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 	return correct/total, correct_adv/total_adv
 
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 def test(model, criterion, testloader, attacker, model_name, att_name):
-=======
-def test(model, criterion, testloader, attacker, name):
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
-def test(model, criterion, testloader, attacker, name):
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
-def test(model, criterion, testloader, attacker, name):
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 	"""
 	Test the model with the data from testloader.
 	attacker is an object that produces adversial inputs given regular inputs.
 	Return the accuracy on the normal inputs and the unperturbed inputs.
 	"""
-<<<<<<< HEAD
-<<<<<<< HEAD
         epsilons = [0.0,0.2,0.4,0.6,0.8,1.0]
         resultsDF = pd.DataFrame(columns=('Model','Attacker','Epsilon','Test_acc','Test_att_acc'))
         global i
@@ -210,41 +135,6 @@ def test(model, criterion, testloader, attacker, name):
         resultsDF.to_csv('DCGAN_attack_results.csv',mode='a',\
                  header=(not os.path.exists('DCGAN_attack_results.csv')))
         pdb.set_trace()
-=======
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-	correct, correct_adv, total = 0.0, 0.0, 0.0
-        epsilon = 1.0
-	for data in testloader:
-		inputs, labels = data
-		inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
-		labels = Variable((labels.cuda() if use_cuda else labels), requires_grad=False)
-
-		y_hat = model(inputs)
-		loss = criterion(y_hat, labels)
-		loss.backward()
-
-		predicted = torch.max(y_hat.data, 1)[1]
-		correct += predicted.eq(labels.data).sum()
-
-		_, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
-	        adv_inputs  = attacker.perturb(inputs,epsilon=epsilon)
-		correct_adv += num_unperturbed
-
-		total += labels.size(0)
-
-        fake = adv_inputs
-        samples_name = 'images/'+name+'_samples.png'
-        vutils.save_image(fake.data,samples_name)
-        print('Test Acc Acc: %.4f | Test Attacked Acc; %.4f'\
-                % (100.*correct/total, 100.*correct_adv/total))
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 	return correct/total, correct_adv/total
 
 def prep(model):
@@ -252,34 +142,6 @@ def prep(model):
 		model.cuda()
 		model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
 		cudnn.benchmark = True
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-
-	return model
-
-
-if __name__ == "__main__":
-	trainloader, testloader = load_cifar()
-	criterion = nn.CrossEntropyLoss()
-<<<<<<< HEAD
-<<<<<<< HEAD
-        do_train = False
-	architectures = [
-<<<<<<< HEAD
-		#(VGG, 'VGG16', 50),
-		#(resnet.ResNet18, 'res18', 100),
-		(densenet.densenet_cifar, 'dense121', 100),
-		(alexnet.AlexNet, 'alex', 100),
-		(googlenet.GoogLeNet, 'googlenet', 100),
-=======
-=======
-        do_train = True
-	architectures = [
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
-
 	return model
 
 
@@ -288,26 +150,13 @@ if __name__ == "__main__":
 	criterion = nn.CrossEntropyLoss()
         do_train = True
 	architectures = [
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
         do_train = True
 	architectures = [
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 		(VGG, 'VGG16', 50),
 		(resnet.ResNet18, 'res18', 500),
 		(densenet.densenet_cifar, 'dense121', 500),
 		(alexnet.AlexNet, 'alex', 500),
 		(googlenet.GoogLeNet, 'googlenet', 500),
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 		(LeNet, 'lenet', 250)
 	]
 
@@ -321,14 +170,10 @@ if __name__ == "__main__":
                         if do_train:
                             train_acc, train_adv_acc = train(model, optimizer,\
                                     criterion, trainloader, name, attacker, num_epochs=epochs)
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
                             suffix = '_AT' if tr_adv else ''
                             attacker.save('saved/{0}{1}_nodrop_joey_attacker_0.0010.pth'.format(name, suffix))
                             torch.save(model.state_dict(),'saved/{0}{1}_no_drop_joey.pth'.format(name, suffix))
                         else:
-<<<<<<< HEAD
                             attacker.load('saved/res18_nodrop_joey_attacker_0.0010.pth')
                             model.load_state_dict(torch.load('saved/dense121_joey.pth'))
                             tr_adv = False
@@ -338,31 +183,10 @@ if __name__ == "__main__":
 			    test_acc, test_adv_acc = test(model,criterion,testloader,\
                                     attacker, name, attacker_name)
 
-=======
-=======
-                        else:
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
-                        else:
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
-                        else:
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
                         pdb.set_trace()
 			suffix = '_AT' if tr_adv else ''
 			attacker.save('saved/{0}{1}_attacker_0.01.pth'.format(name, suffix))
 			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> b3312e52e6013e4776571b59046f8eaa3c4e2794
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
-=======
->>>>>>> 0aea2240a2b7eccdfefcb9acf75194539e4a647c
 
 	"""
 	model = prep(VGG('VGG16'))
