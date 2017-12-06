@@ -25,6 +25,25 @@ def torch_arctanh(x, eps=1e-6):
 	return (torch.log((1 + x) / (1 - x))) * 0.5
 
 
+def BatchVarMahal(X):
+	V = torch.var(X, dim=0, keepdim=True)
+	#return torch.matmul(V[0].view(3,32*32), torch.t(V[0].view(3,32*32)))
+	#print torch.diag(V[0].view(-1))
+	V[0] = 1 + Variable(torch.randn(3,32,32), requires_grad = False)
+	#print V[0]
+	#print torch.diag(V[0].view(-1))
+	#Z = Variable(torch.diag((torch.randn(3*32*32)*0.3)+0.5))
+	#Z = torch.diag((torch.ones(3 * 32 * 32)))
+	return torch.diag(V[0].view(-1))
+	#print Z
+	#return Z
+
+def Mahalanobis_norm(X, M):
+	Y = X.view(X.size(0), 3*32*32, 1)
+	#print torch.matmul(torch.matmul(torch.transpose(Y,1,2),M),Y)
+	return torch.sum(torch.matmul(torch.matmul(torch.transpose(Y, 1, 2), M), Y))
+
+
 class FGSM(object):
 	def __init__(self, epsilon=0.25):
 		self.epsilon = epsilon
@@ -44,7 +63,7 @@ class FGSM(object):
 		
 		predictions = torch.max(model(adv_inputs).data, 1)[1].cpu().numpy()
 		num_unperturbed = (predictions == labels.data.cpu().numpy()).sum()
-		adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0)) ]	
+		adv_inputs = [ adv_inputs[i] for i in range(inputs.size(0))]
 
 		return adv_inputs, predictions, num_unperturbed
 
@@ -338,14 +357,19 @@ class DCGAN(object):
                 The adversarial inputs is a python list of tensors.
                 The predictions is a numpy array of classes, with length equal to the number of inputs.
                 """
-                perturbation = self.generator(Variable(inputs.data)) 
+                perturbation = self.generator(Variable(inputs.data))
 		adv_inputs = inputs + perturbation
 		adv_inputs = torch.clamp(adv_inputs, -1.0, 1.0)
 
 		predictions = model(adv_inputs) 
 		# exponent value (p) in the norm needs to be 4 or higher! IMPORTANT!
-		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (torch.norm(perturbation, 4))
-		print (torch.norm(perturbation, 2) ** 1).data[0]
+		#loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (torch.norm(perturbation, 4))
+		#print BatchVarMahal(inputs)
+		#loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (Mahalanobis_norm(perturbation, BatchVarMahal(inputs)))
+		loss = torch.exp(-1 * self.criterion(predictions, labels)) + self.cg * (
+				Mahalanobis_norm(perturbation, BatchVarMahal(inputs)))
+		#print (torch.norm(perturbation, 2) ** 1).data[0]
+		print Mahalanobis_norm(perturbation, BatchVarMahal(inputs))
 	
 		# optimizer step for the generator
 		self.optimizer.zero_grad()
@@ -379,4 +403,10 @@ class DCGAN(object):
 		torch.save(self.generator.state_dict(), fn)
 
 	def load(self, fn):
-		self.generator.load_state_dict(torch.load(fn))
+		self.generator.load_state_dict(torch.load(fn, map_location=lambda storage, loc: storage))
+		#from collections import OrderedDict
+		#new_state_dict = OrderedDict()
+		#for k, v in self.generator.items():
+		#	name = k[7:]  # remove `module.`
+		#	new_state_dict[name] = v
+		#self.generator.load_state_dict(new_state_dict)

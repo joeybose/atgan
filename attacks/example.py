@@ -95,9 +95,11 @@ def test(model, criterion, testloader, attacker):
 	Return the accuracy on the normal inputs and the unperturbed inputs.
 	"""
 	correct, correct_adv, total = 0.0, 0.0, 0.0
-
+	x_adv = []
+	fhandle = open("attack.npy", 'a')
 	for data in testloader:
 		inputs, labels = data
+		#print inputs
 		inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
 		labels = Variable((labels.cuda() if use_cuda else labels), requires_grad=False)
 
@@ -110,9 +112,14 @@ def test(model, criterion, testloader, attacker):
 
 		adv_inputs, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
 		correct_adv += num_unperturbed
-
+		#x_adv.append(adv_inputs)
+		np.save(fhandle, np.asarray(adv_inputs))
 		total += labels.size(0)
 
+	fhandle.close()
+	#x_adv = np.asarray(x_adv)
+	#x_adv = np.concatenate(x_adv, axis=0)
+	#np.save("/home/firouzi/mycodes/advproj/atgan/attacks/attack.npy", x_adv)
 	return correct/total, correct_adv/total
 
 def prep(model):
@@ -128,29 +135,40 @@ if __name__ == "__main__":
 	trainloader, testloader = load_cifar()
 	criterion = nn.CrossEntropyLoss()
 
+	do_Train = True
+
 	architectures = [
 #		(VGG, 'VGG16', 50),
 		(resnet.ResNet18, 'res16', 50),
-		(densenet.densenet_cifar, 'dense121', 50),
-		(alexnet.AlexNet, 'alex', 50),
-		(googlenet.GoogLeNet, 'googlenet', 50),
-		(LeNet, 'lenet', 250)
+#		(densenet.densenet_cifar, 'dense121', 50),
+#		(alexnet.AlexNet, 'alex', 50),
+#		(googlenet.GoogLeNet, 'googlenet', 50),
+#		(LeNet, 'lenet', 250)
 	]
 
+	file = open("saved/accuracy_by_mahal3.txt", "w")
 	for init_func, name, epochs in architectures:
-		for tr_adv in [False, True]:
-			print name, tr_adv
-			model = prep(init_func())
-			attacker = attacks.DCGAN(train_adv=tr_adv)
+		for tr_adv in [True]:
+				print name, tr_adv
+				model = prep(init_func())
+				attacker = attacks.DCGAN(train_adv=tr_adv)
 
-			optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-			train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=epochs)
-			test_acc, test_adv_acc = test(model, criterion, testloader, attacker)		
+				optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+				if do_Train:
+					train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=epochs)
+					#test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
-			suffix = '_AT' if tr_adv else ''
-			attacker.save('saved/{0}{1}_attacker_0.005.pth'.format(name, suffix))
-			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
+					file.write(name + ', ' + str(train_acc) + ', ' + str(test_acc)+ ', ' + str(test_adv_acc) +
+							   ', ' + str(tr_adv) + ', '  + '\n')
+					suffix = '_AT' if tr_adv else ''
+					attacker.save('saved/{0}{1}_attacker__Mahal.pth'.format(name, suffix))
+					torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
+				else:
+					attacker.load('saved/res16_AT_attacker_0.005.pth')
+					model.load_state_dict(torch.load('saved/res16.pth'))
+				test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
 
+#/home/firouzi/mycodes/advproj/atgan/attacks/
 	"""
 	model = prep(VGG('VGG16'))
 	model2 = prep(VGG('VGG16'))
