@@ -36,14 +36,14 @@ def load_cifar():
 	])
 
 	trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-	trainloader = torch.utils.data.DataLoader(trainset, batch_size=100, shuffle=True, num_workers=2)
+	trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
 
 	testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-	testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+	testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=2)
 	return trainloader, testloader
 
 
-def train(model, optimizer, criterion, trainloader, architecture, attacker=None, num_epochs=25, freq=10, early_stopping=True):
+def train(model, optimizer, criterion, trainloader, architecture, attacker=None, num_epochs=50, freq=10, early_stopping=True):
 	"""
 	Train the model with the optimizer and criterion for num_epochs epochs on data trainloader.
 	attacker is an object that produces adversial inputs given regular inputs.
@@ -54,7 +54,8 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 	for epoch in range(num_epochs):
 		running_loss = 0.0
 		total, correct, correct_adv, total_adv  = 0.0, 0.0, 0.0, 1.0
-                early_stop_param = 0.002
+                early_stop_param = 0.05
+
 		for i, data in enumerate(trainloader):
 			inputs, labels = data
 			inputs = Variable((inputs.cuda() if use_cuda else inputs), requires_grad=True)
@@ -72,7 +73,7 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 			correct += predicted.eq(labels.data).sum()
 
 			# print statistics
-			running_loss = loss.data[0]
+			running_loss += loss.data[0]
 
 			if attacker:
 				# only perturb inputs on the last epoch, to save time
@@ -82,13 +83,15 @@ def train(model, optimizer, criterion, trainloader, architecture, attacker=None,
 				total_adv += labels.size(0)
 
 			if (i+1) % freq == 0:
-                            print '[%s: %d, %5d] loss: %.4f' % (architecture,epoch + 1, i + 1, running_loss / 2),\
+                            print '[%s: %d, %5d] loss: %.4f' % (architecture,epoch + 1, i + 1, running_loss / (i+1)),\
                                     correct/total, correct_adv/total_adv
-                            if early_stopping:
-                                if running_loss / 2 < early_stop_param:
-                                    print("Early Stopping !!!!!!!!!!")
-                                    break
-                            running_loss = 0.0
+
+		if early_stopping:
+			if running_loss / (i+1) < early_stop_param:
+				print("Early Stopping !!!!!!!!!!")
+				break
+
+		running_loss = 0.0
 
 	return correct/total, correct_adv/total_adv
 
@@ -114,16 +117,17 @@ def test(model, criterion, testloader, attacker, name):
 		correct += predicted.eq(labels.data).sum()
 
 		_, adv_labels, num_unperturbed = attacker.attack(inputs, labels, model)
-	        adv_inputs  = attacker.perturb(inputs,epsilon=epsilon)
+	        # adv_inputs  = attacker.perturb(inputs,epsilon=epsilon)
 		correct_adv += num_unperturbed
 
 		total += labels.size(0)
+		print "\n", correct_adv/total
 
-        fake = adv_inputs
-        samples_name = 'images/'+name+'_samples.png'
-        vutils.save_image(fake.data,samples_name)
-        print('Test Acc Acc: %.4f | Test Attacked Acc; %.4f'\
-                % (100.*correct/total, 100.*correct_adv/total))
+        # fake = adv_inputs
+        # samples_name = 'images/'+name+'_samples.png'
+        # vutils.save_image(fake.data,samples_name)
+
+        print('Test Acc Acc: %.4f | Test Attacked Acc; %.4f' % (100.*correct/total, 100.*correct_adv/total))
 	return correct/total, correct_adv/total
 
 def prep(model):
@@ -140,63 +144,46 @@ if __name__ == "__main__":
 	criterion = nn.CrossEntropyLoss()
 
 	architectures = [
-		(VGG, 'VGG16', 50),
-		(resnet.ResNet18, 'res18', 500),
-		(densenet.densenet_cifar, 'dense121', 500),
-		(alexnet.AlexNet, 'alex', 500),
-		(googlenet.GoogLeNet, 'googlenet', 500),
-		(LeNet, 'lenet', 250)
+#		(VGG, 'VGG16', 100),
+#		(resnet.ResNet18, 'res18', 25),
+#		(densenet.densenet_cifar, 'dense121', 500),
+#		(alexnet.AlexNet, 'alex', 500),
+#		(googlenet.GoogLeNet, 'googlenet', 500),
+		(LeNet, 'lenet', 500)
 	]
 
 	do_train = True
 
+	"""
 	for init_func, name, epochs in architectures:
-		for tr_adv in [False, True]:
+		for tr_adv in [False, True][:1]:
 			print name, tr_adv
 			model = prep(init_func())
 			attacker = attacks.DCGAN(train_adv=tr_adv)
 
                      	if do_train:
-			    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+			    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
                             train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, name, attacker, num_epochs=epochs)
-                        else:
 			    test_acc, test_adv_acc = test(model, criterion,testloader, attacker, name)
 
-                        pdb.set_trace()
+                        # pdb.set_trace()
 			suffix = '_AT' if tr_adv else ''
 			attacker.save('saved/{0}{1}_attacker_0.01.pth'.format(name, suffix))
 			torch.save(model.state_dict(), 'saved/{0}{1}.pth'.format(name, suffix))
-
 	"""
+
 	model = prep(VGG('VGG16'))
-	model2 = prep(VGG('VGG16'))
+	model.load_state_dict(torch.load('saved/VGG16.pth'))
 
 	# use default hyperparams for best results!
 	# attacker = attacks.FGSM()
-	# attacker = attacks.CarliniWagner(verbose=True)
-	attacker = attacks.DCGAN(train_adv=False)
+	attacker = attacks.CarliniWagner(verbose=True)
+	# attacker = attacks.DCGAN(train_adv=False)
 
 	criterion = nn.CrossEntropyLoss()
 
-	# train first model adversarially
-	optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model, optimizer, criterion, trainloader, attacker, num_epochs=50)
-	test_acc, test_adv_acc = test(model, criterion, testloader, attacker)
-	attacker.save('VGG_attack_0.005.pth')
-	torch.save(model.state_dict(), 'VGG_50.pth')
-	"""
-
-	"""
 	# train second model normally
 	# attacker.load('VGG_attack_0.005.pth')
-	model2.load_state_dict(torch.load('VGG_50.pth'))
 
-	optimizer2 = optim.SGD(model2.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-	train_acc, train_adv_acc = train(model2, optimizer2, criterion, trainloader, num_epochs=50)
-	torch.save(model2.state_dict(), 'resnet_50.pth')
-
-	test_acc, test_adv_acc = test(model2, criterion, testloader, attacker)
-
-	# print 'Train accuracy of the network on the 10000 test images:', train_acc, train_adv_acc
-        print 'Test accuracy of the network on the 10000 test images:', test_acc, test_adv_acc
-	"""
+	test_acc, test_adv_acc = test(model, criterion, testloader, attacker, 'VGG16')
+	print 'Test accuracy of the network on the 10000 test images:', test_acc, test_adv_acc

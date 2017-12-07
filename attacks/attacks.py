@@ -292,19 +292,15 @@ class DCGAN(object):
 			# input is (nc) x 32 x 32
 			nn.Conv2d(num_channels, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        nn.Dropout2d(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        # nn.Dropout2d(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        # nn.Dropout(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
-                        # nn.Dropout(),
 			# state size. 48 x 32 x 32
 			nn.Conv2d(ngf, ngf, 3, 1, 1, bias=False),
 			nn.LeakyReLU(0.2, inplace=True),
