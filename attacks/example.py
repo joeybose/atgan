@@ -150,8 +150,6 @@ if __name__ == "__main__":
 	criterion = nn.CrossEntropyLoss()
         do_train = True
 	architectures = [
-        do_train = True
-	architectures = [
 		(VGG, 'VGG16', 50),
 		(resnet.ResNet18, 'res18', 500),
 		(densenet.densenet_cifar, 'dense121', 500),
