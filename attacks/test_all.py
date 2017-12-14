@@ -98,8 +98,10 @@ def test_all(classifier_name, path_to_classifier_weights, path_to_CATN, fgsm=Fal
     test_acc, catn_test_adv_acc = test(model, criterion, testloader, attacker_catn)
     timeend3 = time.time()
     #print(catn_test_adv_acc)
-    #print "fgsm time: ", (timeend1-timestart1)
-    #print "cw time: ", (timeend2-timestart2)
+    if (fgsm):
+        print "fgsm time: ", (timeend1-timestart1)
+    if(cw):
+        print "cw time: ", (timeend2-timestart2)
     print "gatn time: " ,(timeend3 - timestart3)
     return test_acc, fgsm_test_adv_acc, cw_test_adv_acc, catn_test_adv_acc
 
@@ -109,13 +111,13 @@ if __name__ == "__main__":
  #   attacker_catn = attacks.DCGAN(train_adv=False)
  #   attacker_catn.load('1_GPU_saved_models/res18_joey_attacker_0.005.pth')
  #   print("loaded")
-    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("classifier_name", help="pick one of 'VGG16','res18','dense121','alex','googlenet','lenet'")
     parser.add_argument("path_to_classifier_weights", help="path to trained classifier weights, eg. saved/VGG16.pth")
     parser.add_argument("path_to_attacker_weights", help="path to CATN generator trained weights, eg. saved/VGG16_attacker_0.005.pth")
     args = parser.parse_args()
-    """
+
     architectures = {
     'VGG16': ['1_GPU_saved_models/VGG16.pth','1_GPU_saved_models/VGG16_attacker_0.005.pth'],
     #'res16': ['1_GPU_saved_models/res18_nodrop_joey.pth','saved/res16_attacker_0.005.pth'],
@@ -131,7 +133,7 @@ if __name__ == "__main__":
     ['1_GPU_saved_models/lenet_nodrop_joey.pth','1_GPU_saved_models/lenet_nodrop_joey_attacker_0.005.pth']
     }
 
-    architectures2 = {
+    architectures_AT = {
     'VGG16': ['1_GPU_saved_models/VGG16_AT.pth','1_GPU_saved_models/VGG16_AT_attacker_0.005.pth'],
     #'res16': ['1_GPU_saved_models/res18_nodrop_joey.pth','saved/res16_attacker_0.005.pth'],
     'res18':
@@ -145,8 +147,14 @@ if __name__ == "__main__":
     'lenet':
     ['1_GPU_saved_models/lenet_AT_nodrop_joey.pth','1_GPU_saved_models/lenet_AT_nodrop_joey_attacker_0.005.pth']
     }
-#
-#test_all('VGG16',architectures['VGG16'][0], architectures['VGG16'][1],fgsm=True,cw=True)
+
+    test_acc, fgsm_test_adv_acc, cw_test_adv_acc, catn_test_adv_acc = test_all(args.classifier_name,args.path_to_classifier_weights,
+        args.path_to_attacker_weights,fgsm=True,cw=True)
+    print "Unperturbed test accuracy: ", test_acc * 100.0
+    print "FGSM attacked test accuracy: ", fgsm_test_adv_acc*100.0
+    print "CarliniWagner attacked test accuracy: ", cw_test_adv_acc*100.0
+    print "CATN attacked test accuracy: ", catn_test_adv_acc*100.0
+'''
     for m in architectures.keys():
         for n in architectures.keys():
             if (m==n):
@@ -159,3 +167,4 @@ if __name__ == "__main__":
                 #print "FGSM attacked test accuracy: ", fgsm_test_adv_acc*100.0
                 #print "CarliniWagner attacked test accuracy: ", cw_test_adv_acc*100.0
                 print "CATN attacked test accuracy: ", catn_test_adv_acc*100.0
+'''
