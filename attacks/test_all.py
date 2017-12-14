@@ -115,7 +115,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("classifier_name", help="pick one of 'VGG16','res18','dense121','alex','googlenet','lenet'")
     parser.add_argument("path_to_classifier_weights", help="path to trained classifier weights, eg. saved/VGG16.pth")
-    parser.add_argument("path_to_attacker_weights", help="path to CATN generator trained weights, eg. saved/VGG16_attacker_0.005.pth")
+    parser.add_argument("path_to_attacker_weights", help="path to GATN generator trained weights, eg. saved/VGG16_attacker_0.005.pth")
+    parser.add_argument("--fgsm", default=False, help="True if want to generate FGSM attacks")
+    parser.add_argument("--cw", default=False, help="True if want to generate CW attacks")
     args = parser.parse_args()
 
     architectures = {
@@ -149,11 +151,13 @@ if __name__ == "__main__":
     }
 
     test_acc, fgsm_test_adv_acc, cw_test_adv_acc, catn_test_adv_acc = test_all(args.classifier_name,args.path_to_classifier_weights,
-        args.path_to_attacker_weights,fgsm=True,cw=True)
+        args.path_to_attacker_weights,fgsm=args.fgsm,cw=args.cw)
     print "Unperturbed test accuracy: ", test_acc * 100.0
-    print "FGSM attacked test accuracy: ", fgsm_test_adv_acc*100.0
-    print "CarliniWagner attacked test accuracy: ", cw_test_adv_acc*100.0
-    print "CATN attacked test accuracy: ", catn_test_adv_acc*100.0
+    if(args.fgsm):
+        print "FGSM attacked test accuracy: ", fgsm_test_adv_acc*100.0
+    if(args.cw):
+        print "CarliniWagner attacked test accuracy: ", cw_test_adv_acc*100.0
+    print "GATN attacked test accuracy: ", catn_test_adv_acc*100.0
 '''
     for m in architectures.keys():
         for n in architectures.keys():
