@@ -1,5 +1,5 @@
-# atgan
-GAN for adversarial attacks; CSC2541 project. By: Kawin, Joey, Romina, Mohammad
+# Crafting Adversarial Attacks with Adversarial Transformations
+Generative Adversarial Transformation Network (GATN); CSC2541 project. By: Kawin, Joey, Romina, Mohammad
 
 1. Prerequisites: Pytorch installed from source (https://github.com/pytorch/pytorch#from-source), Python 2.7, Numpy
 
