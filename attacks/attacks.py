@@ -1,4 +1,5 @@
 import torch
+import pdb
 import numpy as np
 from torch.autograd import Variable
 import torch.nn as nn
@@ -331,7 +332,7 @@ class DCGAN(object):
 		self.optimizer = optim.Adam(self.generator.parameters(), lr=learning_rate)
 		self.train_adv = train_adv
 
-	def attack(self, inputs, labels, model, epsilon=1.0, model_optimizer=None, *args):
+	def attack(self, inputs, labels, model, model_optimizer=None, epsilon=1.0, *args):
                 """
                 Given a set of inputs, return the perturbed inputs (as Variable objects),
                 the predictions for the inputs from the model, and the percentage of inputs
